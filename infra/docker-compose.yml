@@ -1,0 +1,23 @@
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: reposeance-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: reposeance
+    ports:
+      # Host 5434 -> container 5432 (avoids the existing dev containers on 5433)
+      - "5434:5432"
+    volumes:
+      - reposeance_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reposeance"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  reposeance_pgdata:
