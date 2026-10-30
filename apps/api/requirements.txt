@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+gitpython
+tree-sitter
+tree-sitter-languages
+sqlalchemy
+psycopg[binary]
+pgvector
+python-dotenv
+sentry-sdk
+pydantic-settings
