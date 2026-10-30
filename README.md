@@ -1,4 +1,10 @@
-# Repo Séance 👻
+# Repo Séance
+
+```
+  .-.
+ ( o o )
+  | O |
+```
 
 **Repository:** <https://github.com/SomSatwik/repo-seance>
 

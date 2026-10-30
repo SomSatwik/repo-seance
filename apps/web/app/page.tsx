@@ -24,8 +24,11 @@ export default async function Home() {
 
   return (
     <main className="flex min-h-full flex-col items-center justify-center gap-6 p-8 text-center">
+      <pre className="font-mono text-sm leading-tight">
+        {`  .-.\n ( o o )\n  | O |`}
+      </pre>
       <h1 className="text-3xl font-semibold tracking-tight">
-        Repo Séance 👻
+        Repo Séance
       </h1>
       <p className="text-zinc-600 dark:text-zinc-400">
         Live API health — fetched from{" "}
