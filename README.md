@@ -1,5 +1,7 @@
 # Repo Séance 👻
 
+**Repository:** <https://github.com/SomSatwik/repo-seance>
+
 > **Repo Séance** — summon the spirit of any git repository. A local, AI-powered
 > forensic analyzer that ingests a codebase's full git history and lets you
 > interrogate its ghosts in natural language.
