@@ -79,6 +79,13 @@
 - Deliberate transition: homepage link "Open GhostTrace terminal" shifts tone without being jarring.
 - `GHOSTTRACE_ENABLED` flag genuinely gates the feature (verified both states).
 
+## Sprint 2b: Installable GhostTrace CLI
+
+- Added `packages/ghosttrace-cli`, a Python package installed as the `ghosttrace` command.
+- The CLI connects to the existing `/ws/ghosttrace` WebSocket and renders the backend's deterministic verdict and Gemma-grounded explanation; it contains no duplicated safety rules or explanation logic.
+- Ported the horror identity to ANSI terminal output: blood-red DESTRUCTIVE, amber CAUTION, and understated dim SAFE, with the original ASCII logo revealed line by line.
+- Kept both surfaces for distinct purposes: the web terminal is the browser-based demo/preview, while the CLI is the actual installable terminal product. They share the same backend and therefore the same safety behavior.
+
 ## Sprint 1 COMPLETE
 
 All completion criteria met:
