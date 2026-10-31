@@ -101,6 +101,11 @@ def test_git_reset_flag_prefixed_is_caution_not_safe() -> None:
     assert result.level == CAUTION
 
 
+def test_git_global_option_value_is_not_mistaken_for_subcommand() -> None:
+    result = classify("git -C reset status")
+    assert result.level == SAFE
+
+
 # --- DESTRUCTIVE: git push --force / -f -----------------------------------
 
 

@@ -248,7 +248,7 @@ def classify(command: str) -> SafetyResult:
                 level = DESTRUCTIVE
         elif subcommand == "clean":
             destructive_flags = False
-            short_flags = set()
+            short_flags: set[str] = set()
             for option in normalized_options:
                 if option == "--force":
                     destructive_flags = True
