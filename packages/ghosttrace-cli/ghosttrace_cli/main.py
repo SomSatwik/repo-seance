@@ -86,10 +86,12 @@ def run() -> None:
     )
     parser.add_argument(
         "--repo",
-        default=os.environ.get("GHOSTTRACE_REPO_ID", "8"),
-        help="Repository id (default: 8, or GHOSTTRACE_REPO_ID)",
+        default=os.environ.get("GHOSTTRACE_REPO_ID"),
+        help="Repository id (or GHOSTTRACE_REPO_ID)",
     )
     args = parser.parse_args()
+    if not args.repo:
+        parser.error("--repo is required unless GHOSTTRACE_REPO_ID is set")
 
     print()
     render_startup(args.api_url, args.repo)

@@ -38,11 +38,13 @@ ghosttrace --help
 
 ## Run
 
-From any directory, start the interactive prompt with the repository ID used
-by the web terminal (the demo defaults to `8`):
+Import a repository first. The root repository's
+[demo script](../../docs/demo-script.md#2-import-a-fresh-real-repository)
+shows the PowerShell commands that import it, wait for ingestion, and set
+`$repoId` to the returned ID. In that same PowerShell window, run:
 
 ```powershell
-ghosttrace --repo 8
+ghosttrace --repo $repoId
 ```
 
 Type commands to classify and `exit` to quit. `Ctrl+C` also exits cleanly.
@@ -55,12 +57,12 @@ Options:
 | Flag | Env var | Default | Meaning |
 |------|---------|---------|---------|
 | `--api-url` | `GHOSTTRACE_API_URL` | `ws://localhost:8000` | Backend WebSocket URL |
-| `--repo` | `GHOSTTRACE_REPO_ID` | `8` | Repository id to classify against |
+| `--repo` | `GHOSTTRACE_REPO_ID` | Required | Repository id to classify against; use the id returned by ingestion |
 
 Example:
 
 ```powershell
-ghosttrace --repo 8
+ghosttrace --repo $repoId
 ```
 
 Then type a shell command at the `>` prompt:
@@ -76,7 +78,7 @@ Then type a shell command at the `>` prompt:
   command: rm -rf ./build
   rules: rm with recursive + force (rm -rf), ...
   The command `rm -rf ./build` is **DESTRUCTIVE**. ...
-  context: commit:7fd1a60b, readme:README
+  context: commit:60186a9a, ...
 ```
 
 ## Why both a web terminal and CLI?
