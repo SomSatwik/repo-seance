@@ -1,11 +1,10 @@
 """End-to-end ingestion: clone -> scan -> persist file/symbol rows."""
 
-import shutil
 from pathlib import Path
 
 from config import settings
 from models import File
-from .clone import clone_repo
+from .clone import remove_tree, clone_repo
 from .structure import collect_files, scan_structure
 from .symbols import TREE_SITTER_BY_EXT, extract_symbols
 
@@ -27,5 +26,5 @@ def run_ingestion(repo_id: int, url: str, db) -> dict:
         db.flush()
         return summary
     except Exception:
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
         raise

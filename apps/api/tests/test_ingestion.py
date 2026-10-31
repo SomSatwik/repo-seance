@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ingestion.clone import clone_repo
+from ingestion.clone import CloneError, clone_repo
 from ingestion.structure import scan_structure
 from ingestion.symbols import extract_symbols
 
@@ -95,6 +95,23 @@ def test_clone_and_structure(fixture_repo: Path, tmp_path: Path) -> None:
         "requests==2.32.0",
         "flask==3.0.0",
     ]
+
+
+def test_size_limit_rejects_and_removes_clone(tmp_path: Path) -> None:
+    """Exceeding the size limit raises and leaves nothing behind on disk."""
+    repo = tmp_path / "big"
+    repo.mkdir()
+    (repo / "blob.bin").write_bytes(b"x" * (2 * 1024 * 1024))
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+
+    dest = tmp_path / "clone"
+    with pytest.raises(CloneError, match="exceeding the"):
+        clone_repo(repo.as_uri(), dest, max_size_mb=1)
+    assert not dest.exists()
 
 
 def test_symbol_extraction(fixture_repo: Path, tmp_path: Path) -> None:

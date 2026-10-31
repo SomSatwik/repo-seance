@@ -2,6 +2,8 @@
 
 import os
 import shutil
+import stat
+import sys
 import threading
 from pathlib import Path
 from urllib.parse import urlparse
@@ -36,7 +38,7 @@ def clone_repo(
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
 
     git_env = os.environ.copy()
     # Fail fast (never hang prompting) on private repos without credentials.
@@ -62,24 +64,48 @@ def clone_repo(
     t.join(timeout)
 
     if t.is_alive():
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
         raise CloneError(
             f"clone timed out after {timeout}s (limit is configurable via CLONE_TIMEOUT_SECONDS)"
         )
 
     if "e" in err:
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
         raise CloneError(_classify(err["e"], url))
 
     size = _dir_size(dest)
     if size > max_size_mb * 1024 * 1024:
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
         raise CloneError(
             f"cloned repo is {size // (1024 * 1024)} MB, exceeding the "
             f"{max_size_mb} MB limit (configurable via CLONE_MAX_SIZE_MB)"
         )
 
     return dest
+
+
+def remove_tree(path: Path) -> None:
+    """Best-effort recursive delete that also works on Windows.
+
+    Git marks its pack files read-only, which makes ``shutil.rmtree`` fail with
+    ``PermissionError`` on Windows; ``ignore_errors=True`` would then silently
+    leave the rejected clone on disk. Clear the read-only bit and retry.
+    """
+
+    def _force_writable(func, target, _exc_info) -> None:
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except OSError:
+            pass
+
+    if not path.exists():
+        return
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_force_writable)
+    else:
+        shutil.rmtree(path, onerror=_force_writable)
 
 
 def _validate_url(url: str) -> None:
