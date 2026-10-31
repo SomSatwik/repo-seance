@@ -27,6 +27,7 @@ from .render import (
     render_flavor,
     render_explanation,
     render_evidence,
+    render_waiting,
 )
 
 
@@ -64,13 +65,18 @@ async def _repl(client: GhostTraceClient) -> None:
             continue
         if command.lower() in {"exit", "quit", ":q"}:
             break
-        print(colorize("  [analyzing] waiting for the grounded explanation...", DIM))
+        show_waiting = sys.stdout.isatty()
+        if show_waiting:
+            print(render_waiting(), end="", flush=True)
         try:
             verdict = await client.classify(command)
         except Exception as exc:  # noqa: BLE001 - surface connection issues clearly
             print(render_error(str(exc)))
             print(colorize("  the WebSocket may have closed; restart ghosttrace to reconnect", DIM))
             break
+        finally:
+            if show_waiting:
+                print("\r\033[2K", end="", flush=True)
         print(render_verdict(verdict.command, verdict.level, verdict.matched_rules))
         flavor = render_flavor(verdict.level)
         if flavor:

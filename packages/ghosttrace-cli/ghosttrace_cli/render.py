@@ -10,6 +10,7 @@ Ports the web visual identity to raw ANSI escape codes:
 
 from __future__ import annotations
 
+import random
 import shutil
 import sys
 import textwrap
@@ -66,6 +67,17 @@ _DESTRUCTIVE_FLAVORS = cycle(
         "Stop and inspect the consequences before crossing this line.",
     )
 )
+_WAITING_MESSAGES = (
+    "Listening to the commit log...",
+    "Tracing the repository's memory...",
+    "Reading the gaps between commits...",
+    "Following the project's old paths...",
+    "Consulting the archived record...",
+    "Watching the working tree...",
+    "Searching for what changed...",
+    "Listening for the file's history...",
+)
+_last_waiting_message = ""
 
 
 def supports_color() -> bool:
@@ -141,6 +153,17 @@ def render_flavor(level: str) -> str:
     if level == "CAUTION":
         return colorize(f"  {next(_CAUTION_FLAVORS)}", AMBER)
     return ""
+
+
+def render_waiting() -> str:
+    """Choose a brief, non-repeating ambient line for an active request."""
+    global _last_waiting_message
+    candidates = [
+        message for message in _WAITING_MESSAGES
+        if message != _last_waiting_message
+    ]
+    _last_waiting_message = random.choice(candidates)
+    return colorize(f"  {_last_waiting_message}", DIM)
 
 
 def render_explanation(explanation: str, level: str) -> str:
