@@ -21,6 +21,11 @@
                                      └────────────────────────┘
 ```
 
+For the cloud deployment, `render.yaml` provisions the same components in
+Singapore: a public Next.js service, a public FastAPI service, Render Postgres
+with pgvector, and private CPU Ollama. The API's local Git clones and Ollama's
+model cache are mounted on separate persistent disks.
+
 ## Components
 
 - **apps/web** — Next.js (TypeScript, Tailwind, App Router). User-facing UI.

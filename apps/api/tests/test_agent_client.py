@@ -4,6 +4,12 @@ import sentry_sdk
 from agent.client import OllamaClient
 
 
+def test_client_accepts_render_private_hostport():
+    ollama = OllamaClient(host="reposeance-ollama:11434")
+
+    assert ollama.host == "http://reposeance-ollama:11434"
+
+
 def _context_manager(value):
     manager = MagicMock()
     manager.__enter__.return_value = value

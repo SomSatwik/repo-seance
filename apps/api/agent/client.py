@@ -30,7 +30,12 @@ class OllamaClient:
     """
 
     def __init__(self, host: Optional[str] = None, model: Optional[str] = None):
-        self.host = (host or settings.ollama_host).rstrip("/")
+        configured_host = (host or settings.ollama_host).rstrip("/")
+        self.host = (
+            configured_host
+            if "://" in configured_host
+            else f"http://{configured_host}"
+        )
         self.model = model or settings.ollama_model
         self._timeout = 120
 

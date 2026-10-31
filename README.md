@@ -110,6 +110,34 @@ generation spans. No DSN is required for local development; Sentry is disabled
 when the setting is empty. Prompts and local variables are not sent as Sentry
 event data.
 
+## Render deployment
+
+The root [`render.yaml`](render.yaml) is a Render Blueprint for the full app:
+Next.js web service, FastAPI service, managed Postgres with pgvector, and a
+private Ollama service running Gemma 2B plus `nomic-embed-text`. Repository
+clones and Ollama model files use persistent disks so they survive service
+restarts and deploys. The API's pre-deploy step runs Alembic migrations.
+
+1. Push the repository to GitHub and create a Blueprint in the
+   [Render Dashboard](https://dashboard.render.com/), selecting this repo and
+   its `render.yaml`.
+2. Review the Blueprint's monthly estimate before applying it. This setup
+   uses paid compute, a managed database, and persistent disks; Ollama runs on
+   CPU and may respond more slowly than the local GPU-backed setup.
+3. After provisioning, open the web service and confirm its public API URL
+   matches `NEXT_PUBLIC_API_URL` in the Blueprint. If Render assigns a
+   different service subdomain, update that value and the API's
+   `CORS_ORIGINS`, then redeploy.
+4. Wait for the Ollama service to download both models before testing
+   `/ask`, `/roadmap`, or GhostTrace. These model downloads are stored on its
+   persistent disk.
+   The installed CLI can then connect with
+   `ghosttrace --api-url wss://reposeance-api.onrender.com --repo <repo-id>`.
+
+The API is public and the current app has no user authentication or
+rate-limiting; use this deployment for a demo, not for untrusted production
+traffic. Public repository cloning also requires outbound internet access.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored and

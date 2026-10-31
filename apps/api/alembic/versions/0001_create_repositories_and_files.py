@@ -16,6 +16,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
     op.create_table(
         "repositories",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
