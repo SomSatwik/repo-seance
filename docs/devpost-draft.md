@@ -17,10 +17,12 @@
 - **Technical decision**: used GitPython (already a dependency) rather than shelling out to `git` CLI, keeps the API pure Python and consistent with existing clone.py.
 
 ### Part B — Ollama + Gemma integration
-- Installed Ollama (was absent in Phase 0). Pulled `gemma2:2b` (not 9B — fits 6GB VRAM).
-- Built `apps/api/agent/client.py` thin wrapper over Ollama `/api/generate`: `generate(prompt, context)` with model from `OLLAMA_MODEL` env var.
-- Added `GET /system/status` reporting model name, inference mode (GPU/CPU via `nvidia-smi`), and Ollama reachability — not hardcoded.
-- Real test call to Gemma returned coherent response. Latency: [TBD — fill in after first real call].
+- Ollama installed (0.40.13) at C:\Users\ssoms\AppData\Local\Programs\Ollama\. Server running on localhost:11434.
+- `gemma2:2b` pull IN PROGRESS (~99 MB / 1.6 GB at ~3 MB/s, ~8 min remaining). Not 9B — fits 6GB VRAM.
+- Built `apps/api/agent/client.py` thin wrapper over Ollama `/api/generate`: `generate(prompt, context)` with model from `OLLAMA_MODEL` env var. Also has `embed()` and `status()`.
+- Added `GET /system/status` reporting model name, inference mode (GPU/CPU via Ollama `/api/ps`), and Ollama reachability — not hardcoded. Endpoint returns `ollama_reachable:false` until Gemma is loaded.
+- Real test call to Gemma: PENDING (blocked on Gemma download).
+- `OLLAMA_MODEL=gemma2:2b` configured in `.env`.
 - **Technical decision**: `/api/generate` over `/api/chat` for simplicity; single-turn prompts don't need conversation state today.
 
 ### Part C — Evidence retrieval
@@ -44,4 +46,4 @@
 - embed: [BLOCKED — same]
 
 ### Push checkpoints
-- [ ] Pushed to GitHub at natural checkpoints (hashes TBD)
+- [x] Pushed to GitHub at natural checkpoints: `bb28dc3` (Sprint 1 core: history + agent + retrieval + ask/roadmap) — https://github.com/SomSatwik/repo-seance
