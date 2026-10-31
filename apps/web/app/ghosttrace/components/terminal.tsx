@@ -51,6 +51,7 @@ export default function Terminal({ repoId }: TerminalProps) {
     message: string;
   } | null>(null);
   const [connected, setConnected] = useState(false);
+  const [crtEnabled, setCrtEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -309,8 +310,17 @@ export default function Terminal({ repoId }: TerminalProps) {
             </p>
           </div>
         </div>
-        <div className="font-mono text-xs text-[var(--gt-muted)]">
-          Safety engine: deterministic (no LLM verdict)
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCrtEnabled(!crtEnabled)}
+            className="font-mono text-[10px] px-2.5 py-1 rounded border border-[#2d5d67] bg-[#0c242c] text-[#9ef368] hover:bg-[#133845] transition-colors"
+          >
+            📺 CRT: {crtEnabled ? "ON" : "OFF"}
+          </button>
+          <div className="font-mono text-xs text-[var(--gt-muted)] hidden sm:block">
+            Safety engine: deterministic (no LLM verdict)
+          </div>
         </div>
       </header>
 

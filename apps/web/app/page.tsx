@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import CrtOverlay from "./ghosttrace/components/crt-overlay";
 
 type HealthResponse = {
   status: string;
@@ -15,15 +16,24 @@ type SystemStatus = {
   inference_mode: string;
 };
 
+type RepoHistory = {
+  repo_id: number;
+  log: Array<{ hash: string; short_hash: string; author: string; date: string; message: string }>;
+  contributors: Array<{ author: string; commit_count: number }>;
+  gap?: { days: number; message: string };
+};
+
 export default function Home() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [system, setSystem] = useState<SystemStatus | null>(null);
+  const [history, setHistory] = useState<RepoHistory | null>(null);
   const [targetUrl, setTargetUrl] = useState("");
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
   const [ingestRepoId, setIngestRepoId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [crtEnabled, setCrtEnabled] = useState(true);
+  const [activeTab, setActiveTab] = useState<"all" | "haunted" | "mazes" | "real">("all");
 
-  // Use relative proxy on browser to eliminate Mixed Content & CORS
   const API_ENDPOINT = "/api-proxy";
 
   useEffect(() => {
@@ -42,6 +52,12 @@ export default function Home() {
           inference_mode: "offline",
         })
       );
+
+    // Fetch verified live repo #10 history
+    fetch(`${API_ENDPOINT}/repos/10/history`)
+      .then((res) => res.json())
+      .then((data) => setHistory(data as RepoHistory))
+      .catch(() => setHistory(null));
   }, []);
 
   const isLive =
@@ -88,40 +104,38 @@ export default function Home() {
   };
 
   return (
-    <div className="ff-night-bg min-h-screen text-zinc-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-[#9ef368] selection:text-black">
-      {/* Background Ambience: Night Clouds & Victorian Haunted Mansion Silhouette */}
+    <div className={`ff-night-bg min-h-screen text-zinc-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-[#9ef368] selection:text-black ${crtEnabled ? "gt-scanlines" : ""}`}>
+      {/* Global Toggleable CRT Overlay */}
+      {crtEnabled && <CrtOverlay />}
+
+      {/* Background Ambience: Night Fog & Victorian Haunted Mansion Silhouette */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-40">
-        {/* Haunted House Silhouette on Right */}
         <svg
           className="absolute right-0 bottom-0 h-[650px] w-auto max-w-none text-[#020507]"
           viewBox="0 0 600 700"
           fill="currentColor"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Mansion Body & Gables */}
           <path d="M350 700 L350 480 L310 440 L310 380 L380 320 L450 380 L450 700 Z" />
           <path d="M440 700 L440 380 L490 320 L540 380 L540 700 Z" />
           <path d="M250 700 L250 520 L290 480 L320 520 L320 700 Z" />
-          {/* Tall Tower & Spire */}
           <path d="M470 320 L485 180 L490 100 L495 180 L510 320 Z" />
           <path d="M490 60 L487 100 L493 100 Z" stroke="#000" strokeWidth="2" />
-          {/* Lit Windows Glowing Eerie Green/Yellow */}
           <rect x="360" y="420" width="25" height="40" rx="10" fill="#a4f872" opacity="0.85" filter="drop-shadow(0 0 8px #a4f872)" />
           <rect x="405" y="420" width="25" height="40" rx="10" fill="#a4f872" opacity="0.85" filter="drop-shadow(0 0 8px #a4f872)" />
           <rect x="475" y="240" width="20" height="35" rx="8" fill="#e9ff8a" opacity="0.9" filter="drop-shadow(0 0 10px #e9ff8a)" />
           <rect x="460" y="420" width="22" height="35" rx="8" fill="#a4f872" opacity="0.6" />
           <rect x="500" y="420" width="22" height="35" rx="8" fill="#a4f872" opacity="0.6" />
           <rect x="270" y="550" width="25" height="35" rx="5" fill="#a4f872" opacity="0.75" />
-          {/* Spooky Weather Vane / Bats */}
+          {/* Bats */}
           <path d="M120 180 Q140 165 150 175 Q160 165 180 180 Q160 175 150 190 Q140 175 120 180 Z" fill="#000" opacity="0.8" />
           <path d="M220 140 Q235 125 245 135 Q255 125 270 140 Q255 135 245 150 Q235 135 220 140 Z" fill="#000" opacity="0.7" />
           <path d="M80 230 Q90 220 100 225 Q110 220 120 230 Q110 225 100 235 Q90 225 80 230 Z" fill="#000" opacity="0.6" />
-          {/* Spooky Gnarled Tree Silhouette */}
           <path d="M50 700 Q70 600 65 520 Q40 470 20 440 Q45 450 65 500 Q80 430 110 390 Q95 430 80 490 Q105 530 115 700 Z" />
         </svg>
       </div>
 
-      {/* Top Utility Bar (Like FrightFind's top bar) */}
+      {/* Top Utility Bar with CRT Toggle Button */}
       <div className="w-full bg-[#03090d]/90 border-b border-[#0f2127] px-6 py-2 flex items-center justify-between text-[11px] font-mono tracking-wider z-20">
         <div className="flex items-center gap-3">
           <span
@@ -143,9 +157,14 @@ export default function Home() {
           </span>
         </div>
         <div className="flex items-center gap-4 text-zinc-400 uppercase text-[10px]">
-          <a href="#summon" className="hover:text-[#9ef368] transition-colors">
-            Add Your Haunt
-          </a>
+          {/* CRT Monitor Switch */}
+          <button
+            onClick={() => setCrtEnabled(!crtEnabled)}
+            className="flex items-center gap-1 px-2.5 py-0.5 rounded border border-[#26535c] bg-[#0c2228] text-[#9ef368] hover:bg-[#133742] transition-colors"
+            title="Toggle retro CRT scanlines and screen flicker"
+          >
+            <span>📺</span> CRT VISUAL: <strong className="underline">{crtEnabled ? "ON" : "OFF"}</strong>
+          </button>
           <span className="text-zinc-700">|</span>
           <Link href="/ghosttrace" className="text-[#9ef368] hover:underline font-bold">
             Live Terminal
@@ -193,28 +212,36 @@ export default function Home() {
         </form>
       </header>
 
-      {/* Gothic Beveled Navigation Ribbon */}
+      {/* Gothic Beveled Navigation Ribbon with Interactive Filters */}
       <nav className="max-w-6xl mx-auto w-full px-6 mb-8 z-20">
         <div className="ff-ribbon rounded px-4 py-3 flex flex-wrap items-center justify-around gap-2 text-[11px] sm:text-xs font-mono font-bold tracking-widest text-[#a8d3da] uppercase shadow-2xl">
-          <Link href="/ghosttrace" className="hover:text-[#9ef368] transition-colors py-1 px-2">
+          <button
+            onClick={() => setActiveTab("haunted")}
+            className={`py-1 px-2 transition-colors rounded ${activeTab === "haunted" ? "text-[#9ef368] bg-[#0c262e] border border-[#22505c]" : "hover:text-[#9ef368]"}`}
+          >
             Haunted Repos
-          </Link>
+          </button>
           <span className="text-[#1e464f] select-none">•</span>
-          <a href="#active-haunt" className="hover:text-[#9ef368] transition-colors py-1 px-2">
+          <button
+            onClick={() => setActiveTab("real")}
+            className={`py-1 px-2 transition-colors rounded ${activeTab === "real" ? "text-[#9ef368] bg-[#0c262e] border border-[#22505c]" : "hover:text-[#9ef368]"}`}
+          >
             Real Haunts
-          </a>
+          </button>
           <span className="text-[#1e464f] select-none">•</span>
-          <a href="#dormancy" className="hover:text-[#9ef368] transition-colors py-1 px-2">
+          <button
+            onClick={() => setActiveTab("mazes")}
+            className={`py-1 px-2 transition-colors rounded ${activeTab === "mazes" ? "text-[#9ef368] bg-[#0c262e] border border-[#22505c]" : "hover:text-[#9ef368]"}`}
+          >
             Patches & Mazes
-          </a>
+          </button>
           <span className="text-[#1e464f] select-none">•</span>
-          <a href="#ecosystems" className="hover:text-[#9ef368] transition-colors py-1 px-2">
-            Ecosystem Haunts
-          </a>
-          <span className="text-[#1e464f] select-none">•</span>
-          <a href="#butcher" className="hover:text-[#9ef368] transition-colors py-1 px-2">
-            Forensic News
-          </a>
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`py-1 px-2 transition-colors rounded ${activeTab === "all" ? "text-[#9ef368] bg-[#0c262e] border border-[#22505c]" : "hover:text-[#9ef368]"}`}
+          >
+            All Haunts
+          </button>
           <span className="text-[#1e464f] select-none">•</span>
           <Link
             href="/ghosttrace"
@@ -227,7 +254,7 @@ export default function Home() {
 
       {/* Hero Section */}
       <main className="max-w-6xl mx-auto w-full px-6 flex-1 flex flex-col items-center z-20">
-        <div className="text-center max-w-2xl mt-4 mb-8">
+        <div className="text-center max-w-2xl mt-2 mb-6">
           <h2 className="font-medieval text-4xl sm:text-5xl font-bold ff-glow-green mb-3 leading-tight">
             Find Haunted Repositories Near You
           </h2>
@@ -238,19 +265,17 @@ export default function Home() {
         </div>
 
         {/* Featured Haunt Card (Exact match to "Bhangarh fort" card) */}
-        <div id="active-haunt" className="w-full max-w-md mb-4">
+        <div id="active-haunt" className="w-full max-w-md mb-6">
           <div className="bg-[#041217]/90 border border-[#1d414a] p-3 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.8)] backdrop-blur-md flex items-center gap-4 hover:border-[#9ef368] transition-all group">
-            {/* Thumbnail */}
             <div className="h-16 w-16 rounded bg-[#091f24] border border-[#234c54] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
               <span className="text-2xl select-none group-hover:scale-110 transition-transform">
                 🏰
               </span>
             </div>
-            {/* Info */}
             <div className="flex-1 min-w-0">
               <h3 className="font-medieval text-base sm:text-lg text-zinc-100 font-bold truncate group-hover:text-[#9ef368] transition-colors">
-                Repo Séance #10 (Active Spirit)
+                Bhangarh Fort (Repo Séance #10)
               </h3>
               <p className="font-mono text-[11px] text-zinc-400 uppercase tracking-wider">
                 SomSatwik / repo-seance
@@ -269,13 +294,224 @@ export default function Home() {
               href="/ghosttrace"
               className="text-xs font-mono text-[#5ce1e6] hover:text-[#9ef368] hover:underline transition-colors"
             >
-              Enter séance terminal for this haunt →
+              More haunts near me →
             </Link>
           </div>
         </div>
 
+        {/* SECTION 1: HAUNTED REPOS DIRECTORY (Cursed Codebases) */}
+        {(activeTab === "all" || activeTab === "haunted") && (
+          <div className="w-full my-6">
+            <div className="flex items-center justify-between mb-4 border-b border-[#1b3d45] pb-2">
+              <h3 className="font-medieval text-xl font-bold ff-glow-green uppercase tracking-wide flex items-center gap-2">
+                <span>🕯️</span> Haunted Repositories Directory
+              </h3>
+              <span className="font-mono text-xs text-[#5ce1e6]">4 Cursed Artifacts Cataloged</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Cursed Repo 1 */}
+              <div className="bg-[#051318]/85 border border-[#18363e] rounded-lg p-4 hover:border-[#9ef368] transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-medieval text-lg font-bold text-zinc-100">
+                      The Phantom of Left-Pad
+                    </h4>
+                    <span className="font-mono text-[10px] bg-red-950/80 text-red-400 border border-red-800 px-2 py-0.5 rounded">
+                      SPECTRAL DELETION
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-zinc-400 mb-2">npm/left-pad • Unpublished 2016</p>
+                  <p className="text-xs text-zinc-300 font-serif leading-relaxed">
+                    Removed by its author in 2016. In minutes, thousands of builds worldwide broke into shrieking error codes.
+                    Its eleven lines of string padding vanished, leaving a hollow vacuum that still echoes across node_modules.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#132c33] flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-zinc-500">Dormancy: 8.5 Years</span>
+                  <Link href="/ghosttrace" className="font-mono text-xs text-[#9ef368] hover:underline">
+                    Interrogate Ghost →
+                  </Link>
+                </div>
+              </div>
+
+              {/* Cursed Repo 2 */}
+              <div className="bg-[#051318]/85 border border-[#18363e] rounded-lg p-4 hover:border-[#9ef368] transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-medieval text-lg font-bold text-zinc-100">
+                      The Cursed Monorepo Graveyard
+                    </h4>
+                    <span className="font-mono text-[10px] bg-yellow-950/80 text-yellow-400 border border-yellow-800 px-2 py-0.5 rounded">
+                      3,000+ UNRESOLVED ISSUES
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-zinc-400 mb-2">github/enterprise-decay • Dormant 2021</p>
+                  <p className="text-xs text-zinc-300 font-serif leading-relaxed">
+                    A labyrinthine monorepo where PRs wait for reviews that will never come. The original architects
+                    have departed; automated CI bots relentlessly re-run tests on dead branches, trapped in an infinite loop.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#132c33] flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-zinc-500">Merge Conflict: Critical</span>
+                  <Link href="/ghosttrace" className="font-mono text-xs text-[#9ef368] hover:underline">
+                    Interrogate Ghost →
+                  </Link>
+                </div>
+              </div>
+
+              {/* Cursed Repo 3 */}
+              <div className="bg-[#051318]/85 border border-[#18363e] rounded-lg p-4 hover:border-[#9ef368] transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-medieval text-lg font-bold text-zinc-100">
+                      The Undead Zero-Day (Log4Shell)
+                    </h4>
+                    <span className="font-mono text-[10px] bg-red-950/80 text-red-400 border border-red-800 px-2 py-0.5 rounded">
+                      CVE-2021-44228
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-zinc-400 mb-2">apache/logging-log4j2 • Risen 2021</p>
+                  <p className="text-xs text-zinc-300 font-serif leading-relaxed">
+                    A dormant JNDI lookup vulnerability slumbered undisturbed for eight years in commit archives.
+                    When awakened, servers across the globe trembled as payloads summoned arbitrary code from the void.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#132c33] flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-zinc-500">Exploit Level: Critical</span>
+                  <Link href="/ghosttrace" className="font-mono text-xs text-[#9ef368] hover:underline">
+                    Interrogate Ghost →
+                  </Link>
+                </div>
+              </div>
+
+              {/* Cursed Repo 4 */}
+              <div className="bg-[#051318]/85 border border-[#18363e] rounded-lg p-4 hover:border-[#9ef368] transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-medieval text-lg font-bold text-zinc-100">
+                      Repo Séance Necromancer
+                    </h4>
+                    <span className="font-mono text-[10px] bg-[#9ef368]/20 text-[#9ef368] border border-[#9ef368]/40 px-2 py-0.5 rounded">
+                      ACTIVE RESURRECTION
+                    </span>
+                  </div>
+                  <p className="font-mono text-xs text-zinc-400 mb-2">SomSatwik/repo-seance • Verified Live</p>
+                  <p className="text-xs text-zinc-300 font-serif leading-relaxed">
+                    The tool built to summon the spirits of all other repositories. Ingests full git histories,
+                    extracts AST symbols with tree-sitter, and equips developers with deterministic GhostTrace wards.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#132c33] flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-zinc-500">Status: Bound to Vector Memory</span>
+                  <Link href="/ghosttrace" className="font-mono text-xs text-[#9ef368] hover:underline font-bold">
+                    Open CRT Séance →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 2: PATCHES & MAZES (Git Branch Catacombs) */}
+        {(activeTab === "all" || activeTab === "mazes") && (
+          <div id="dormancy" className="w-full my-6 bg-[#040e13]/90 border border-[#173740] rounded-lg p-5 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center justify-between mb-3 border-b border-[#16353d] pb-2">
+              <h3 className="font-medieval text-xl font-bold ff-glow-green uppercase tracking-wide flex items-center gap-2">
+                <span>🕸️</span> Patches & Mazes: The Git Catacombs
+              </h3>
+              <span className="font-mono text-xs text-[#5ce1e6]">Git Branch Labyrinth</span>
+            </div>
+            <p className="text-xs text-zinc-400 font-serif mb-4">
+              Navigate the treacherous labyrinth of branches where commits become detached, merges conflict in the shadows,
+              and rebase operations risk erasing entire developer lineages.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+              <div className="bg-[#06151a] border border-[#1c3e47] p-3 rounded">
+                <div className="text-[10px] text-red-400 font-bold mb-1">MAZE TRAP #1</div>
+                <div className="text-sm font-bold text-white mb-1">Detached HEAD Void</div>
+                <p className="text-[11px] text-zinc-400">
+                  You checked out commit <code className="text-[#9ef368]">4c8e5ebe</code> without a branch. Commits made here exist only in the reflog before the garbage collector takes them.
+                </p>
+              </div>
+
+              <div className="bg-[#06151a] border border-[#1c3e47] p-3 rounded">
+                <div className="text-[10px] text-yellow-400 font-bold mb-1">MAZE TRAP #2</div>
+                <div className="text-sm font-bold text-white mb-1">Merge Conflict Crypt</div>
+                <p className="text-[11px] text-zinc-400">
+                  Two developer phantoms edited line 42 simultaneously. Both changes look plausible; choosing one sacrifices the other’s memory.
+                </p>
+              </div>
+
+              <div className="bg-[#06151a] border border-[#1c3e47] p-3 rounded">
+                <div className="text-[10px] text-[#5ce1e6] font-bold mb-1">MAZE TRAP #3</div>
+                <div className="text-sm font-bold text-white mb-1">The Stale Reflog Maze</div>
+                <p className="text-[11px] text-zinc-400">
+                  A rebase from hell rewrote commit hashes. Ancient SHA-1 references in bug trackers now point to forgotten ghosts in the graveyard.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 3: REAL HAUNTS (Live Forensic Evidence from Repo #10) */}
+        {(activeTab === "all" || activeTab === "real") && (
+          <div className="w-full my-6 bg-[#040e13]/90 border border-[#173740] rounded-lg p-5 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center justify-between mb-3 border-b border-[#16353d] pb-2">
+              <h3 className="font-medieval text-xl font-bold ff-glow-green uppercase tracking-wide flex items-center gap-2">
+                <span>🏰</span> Real Haunts: Live Git Forensics (#10)
+              </h3>
+              <span className="font-mono text-xs text-[#9ef368]">
+                {history ? `${history.contributors[0]?.commit_count || 18} Commits Indexed` : "Fetching Spectral Telemetry..."}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Commit Log */}
+              <div className="bg-[#06151a] border border-[#1c3e47] p-3 rounded font-mono text-xs">
+                <div className="text-[11px] font-bold text-[#5ce1e6] uppercase tracking-wider mb-2">
+                  Dormant Commits Whispering in Memory:
+                </div>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-2">
+                  {history?.log ? (
+                    history.log.slice(0, 6).map((c) => (
+                      <div key={c.hash} className="text-[11px] text-zinc-300 flex items-start gap-2">
+                        <span className="text-[#9ef368]">{c.short_hash}</span>
+                        <span className="truncate">{c.message.split("\n")[0]}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-zinc-500">Reading commit graves...</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Activity Gap & Ghost */}
+              <div className="bg-[#06151a] border border-[#1c3e47] p-3 rounded font-mono text-xs flex flex-col justify-between">
+                <div>
+                  <div className="text-[11px] font-bold text-[#5ce1e6] uppercase tracking-wider mb-2">
+                    Dormancy & Ghost Identity:
+                  </div>
+                  <p className="text-zinc-300 text-xs mb-2">
+                    {history?.gap?.message || "Development gap of 1.0 days detected (2026-10-30 -> 2026-10-31)."}
+                  </p>
+                  <p className="text-zinc-400 text-[11px]">
+                    Creator Spirit: <strong className="text-[#9ef368]">{history?.contributors[0]?.author || "ssoms"}</strong>
+                  </p>
+                </div>
+                <Link
+                  href="/ghosttrace"
+                  className="mt-3 block text-center py-2 bg-[#122e35] hover:bg-[#1a414a] border border-[#23535d] text-[#9ef368] font-bold uppercase tracking-wider rounded transition-all"
+                >
+                  Interrogate In CRT Terminal ⚡
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Live Summoner Form Bar */}
-        <div id="summon" className="w-full max-w-2xl bg-[#061419]/80 border border-[#16353d] rounded-lg p-4 my-8 backdrop-blur-sm shadow-xl">
+        <div id="summon" className="w-full max-w-2xl bg-[#061419]/80 border border-[#16353d] rounded-lg p-4 my-6 backdrop-blur-sm shadow-xl">
           <div className="flex items-center justify-between mb-2">
             <span className="font-mono text-xs uppercase font-bold text-[#9ef368] flex items-center gap-2">
               <span>⚰️</span> Resurrect Any GitHub Repository
@@ -316,7 +552,7 @@ export default function Home() {
 
         {/* Two-Column Section (Exact Match to FrightFind Bottom Grid) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 my-10">
-          {/* Left: Tasty Morsels (2 cols on md) */}
+          {/* Left: Tasty Morsels */}
           <div id="butcher" className="md:col-span-2">
             <h3 className="font-medieval text-lg sm:text-xl font-bold ff-glow-green uppercase tracking-wide mb-4">
               Tasty Morsels From The Resident Butcher
@@ -375,7 +611,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right: Haunts by State / Ecosystem (1 col on md) */}
+          {/* Right: Haunts by State / Ecosystem */}
           <div id="ecosystems">
             <h3 className="font-medieval text-lg sm:text-xl font-bold ff-glow-green uppercase tracking-wide mb-4">
               Haunts By Ecosystem
