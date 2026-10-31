@@ -31,6 +31,37 @@ ITALIC = "\033[3m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
+WAITING_MESSAGES = [
+    "listening to the commit log...",
+    "the repository stirs...",
+    "tracing what came before...",
+    "old commits are speaking...",
+    "something moved in the history...",
+    "the ghost recalls this file...",
+    "digging through buried commits...",
+    "the blame trail runs deep...",
+    "waking the dead branches...",
+    "the archive remembers...",
+    "a shadow passes through the diff...",
+    "the dead code twitches...",
+    "something was left unfinished here...",
+    "the logs whisper of what happened...",
+    "retracing abandoned footsteps...",
+    "the last commit grows cold...",
+    "sifting through forgotten changes...",
+    "this file has seen things...",
+    "the history does not forget...",
+    "something familiar in this blame...",
+]
+
+STARTUP_MESSAGES = [
+    "a presence stirs in the repository...",
+    "the ghost has found your files...",
+    "something still lingers here...",
+    "the archive wakes...",
+    "old code, old ghosts...",
+]
+
 # Original GhostTrace mark; use ASCII cursor blocks for compatibility with
 # Windows terminals that replace unsupported glyphs instead of raising.
 ASCII_LOGO = r"""  ___       ___       ___
@@ -67,17 +98,6 @@ _DESTRUCTIVE_FLAVORS = cycle(
         "Stop and inspect the consequences before crossing this line.",
     )
 )
-_WAITING_MESSAGES = (
-    "Listening to the commit log...",
-    "Tracing the repository's memory...",
-    "Reading the gaps between commits...",
-    "Following the project's old paths...",
-    "Consulting the archived record...",
-    "Watching the working tree...",
-    "Searching for what changed...",
-    "Listening for the file's history...",
-)
-_last_waiting_message = ""
 
 
 def supports_color() -> bool:
@@ -156,14 +176,8 @@ def render_flavor(level: str) -> str:
 
 
 def render_waiting() -> str:
-    """Choose a brief, non-repeating ambient line for an active request."""
-    global _last_waiting_message
-    candidates = [
-        message for message in _WAITING_MESSAGES
-        if message != _last_waiting_message
-    ]
-    _last_waiting_message = random.choice(candidates)
-    return colorize(f"  {_last_waiting_message}", DIM)
+    """Choose an ambient line for an active request."""
+    return colorize(f"  [analyzing] {random.choice(WAITING_MESSAGES)}", DIM)
 
 
 def render_explanation(explanation: str, level: str) -> str:
@@ -205,6 +219,7 @@ def render_startup(api_url: str, repo_id: str) -> None:
     print_logo(delay=0.03)
     print()
     print(colorize("  ghosttrace", BOLD))
+    print(colorize(f"  {random.choice(STARTUP_MESSAGES)}", DIM))
     print(f"  api:     {api_url}")
     print(colorize(f"  repo:    {repo_id}", DIM))
     print(colorize("  type a command and press enter, or Ctrl+C to exit", ITALIC))

@@ -29,13 +29,24 @@ class RenderExplanationTests(unittest.TestCase):
         self.assertEqual(reconstructed, explanation)
         self.assertTrue(all(len(line) <= terminal_width for line in lines))
 
-    def test_waiting_lines_are_short_and_do_not_repeat_consecutively(self):
-        render._last_waiting_message = ""
+    def test_waiting_message_is_chosen_fresh_for_each_request(self):
+        chosen = [
+            "the repository stirs...",
+            "tracing what came before...",
+            "old commits are speaking...",
+        ]
         with patch("ghosttrace_cli.render.supports_color", return_value=False):
-            messages = [render.render_waiting() for _ in range(3)]
+            with patch(
+                "ghosttrace_cli.render.random.choice", side_effect=chosen
+            ) as choice:
+                messages = [render.render_waiting() for _ in range(3)]
 
-        self.assertEqual(len(set(messages)), 3)
-        self.assertTrue(all(len(message.strip()) <= 40 for message in messages))
+        self.assertEqual(
+            messages,
+            [f"  [analyzing] {message}" for message in chosen],
+        )
+        self.assertEqual(choice.call_count, 3)
+        self.assertTrue(all(len(message) <= 40 for message in chosen))
 
 
 if __name__ == "__main__":
