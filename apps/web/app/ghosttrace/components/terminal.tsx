@@ -38,7 +38,7 @@ const getWsUrl = () => {
       return "ws://localhost:8000";
     }
     if (window.location.protocol === "https:") {
-      return process.env.NEXT_PUBLIC_WS_URL ?? "wss://mainland-mirrors-widely-advertise.trycloudflare.com";
+      return process.env.NEXT_PUBLIC_WS_URL ?? "wss://showtimes-moved-generation-listen.trycloudflare.com";
     }
     return `ws://${window.location.host}`;
   }
