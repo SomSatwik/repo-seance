@@ -1,14 +1,23 @@
 """Repo Séance API — FastAPI entry point."""
 
+import sentry_sdk
+from config import settings
+from database import engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from ghosttrace.router import router as ghosttrace_router
+from routers import agent
+from routers import history
+from routers import repos
 from sqlalchemy import text
 
-from database import engine
-from routers import repos
-from routers import history
-from routers import agent
-from ghosttrace.router import router as ghosttrace_router
+if settings.sentry_dsn and settings.sentry_dsn.strip():
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn.strip(),
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        include_local_variables=False,
+    )
 
 app = FastAPI(title="Repo Séance API", version="0.2.0")
 

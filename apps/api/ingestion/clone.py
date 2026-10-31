@@ -23,12 +23,12 @@ def clone_repo(
     timeout: int | None = None,
     max_size_mb: int | None = None,
 ) -> Path:
-    """Clone ``url`` into ``dest`` using a shallow clone with a size/time guard.
+    """Clone ``url`` into ``dest`` with a size/time guard.
 
     Limits are configurable via settings/env: ``CLONE_TIMEOUT_SECONDS``,
-    ``CLONE_MAX_SIZE_MB``, ``CLONE_DEPTH``. The shallow ``--depth`` clone is the
-    primary size control; ``max_size_mb`` is a post-clone guard that deletes the
-    result if it is exceeded.
+    ``CLONE_MAX_SIZE_MB``, ``CLONE_DEPTH``. A positive depth makes a shallow
+    clone; zero (the default) keeps the full history of the default branch.
+    ``max_size_mb`` remains a post-clone guard.
     """
     timeout = timeout or settings.clone_timeout_seconds
     max_size_mb = max_size_mb or settings.clone_max_size_mb
@@ -47,12 +47,16 @@ def clone_repo(
 
     err: dict = {}
 
+    clone_options = ["--single-branch"]
+    if settings.clone_depth > 0:
+        clone_options.extend(["--depth", str(settings.clone_depth)])
+
     def _run() -> None:
         try:
             Repo.clone_from(
                 url,
                 str(dest),
-                multi_options=["--depth", str(settings.clone_depth), "--single-branch"],
+                multi_options=clone_options,
                 allow_unsafe_protocols=True,
                 env=git_env,
             )

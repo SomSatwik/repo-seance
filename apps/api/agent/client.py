@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Optional
+
+import sentry_sdk
 
 from config import settings
 
@@ -46,11 +49,17 @@ class OllamaClient:
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 body = resp.read().decode("utf-8")
         except urllib.error.URLError as exc:  # noqa: BLE001 - surface to caller
-            return {"_error": f"Ollama unreachable at {self.host}: {exc}"}
+            return {
+                "_error": f"Ollama unreachable at {self.host}: {exc}",
+                "_error_type": type(exc).__name__,
+            }
         try:
             return json.loads(body)
         except json.JSONDecodeError:
-            return {"_error": f"Invalid JSON from Ollama: {body[:200]}"}
+            return {
+                "_error": f"Invalid JSON from Ollama: {body[:200]}",
+                "_error_type": "JSONDecodeError",
+            }
 
     # -- public API ----------------------------------------------------
 
@@ -66,10 +75,61 @@ class OllamaClient:
         }
         if context:
             payload["context"] = context
-        result = self._post("/api/generate", payload)
-        if "_error" in result:
-            return f"[error] {result['_error']}"
-        return result.get("response", "")
+        started = time.perf_counter()
+        with sentry_sdk.start_span(op="ai.inference", name="ollama.generate") as span:
+            span.set_data("model", self.model)
+            span.set_data("success", False)
+            try:
+                result = self._post("/api/generate", payload)
+            except Exception as exc:
+                latency_ms = round((time.perf_counter() - started) * 1000, 2)
+                span.set_data("latency_ms", latency_ms)
+                self._capture_generate_failure(latency_ms, type(exc).__name__)
+                raise
+
+            latency_ms = round((time.perf_counter() - started) * 1000, 2)
+            span.set_data("latency_ms", latency_ms)
+            for field, key in (
+                ("prompt_tokens", "prompt_eval_count"),
+                ("completion_tokens", "eval_count"),
+            ):
+                if isinstance(result.get(key), int):
+                    span.set_data(field, result[key])
+            if isinstance(result.get("total_duration"), int):
+                span.set_data(
+                    "ollama_total_duration_ms",
+                    result["total_duration"] / 1_000_000,
+                )
+
+            if "_error" in result:
+                self._capture_generate_failure(
+                    latency_ms,
+                    result.get("_error_type", "OllamaRequestError"),
+                )
+                return f"[error] {result['_error']}"
+
+            span.set_data("success", True)
+            return result.get("response", "")
+
+    def _capture_generate_failure(self, latency_ms: float, failure_type: str) -> None:
+        """Capture a sanitized model-call failure without recording the prompt."""
+        try:
+            raise RuntimeError(f"Ollama generate request failed ({failure_type})")
+        except RuntimeError as exc:
+            with sentry_sdk.push_scope() as scope:
+                scope.set_tag("ai.provider", "ollama")
+                scope.set_tag("ai.model", self.model)
+                scope.set_tag("ai.failure_type", failure_type)
+                scope.set_context(
+                    "ai.call",
+                    {
+                        "operation": "generate",
+                        "success": False,
+                        "latency_ms": latency_ms,
+                        "failure_type": failure_type,
+                    },
+                )
+                sentry_sdk.capture_exception(exc)
 
     def embed(self, text: str, model: Optional[str] = None) -> list[float]:
         """Return an embedding vector for ``text`` via Ollama's embeddings API."""
