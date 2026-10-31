@@ -10,10 +10,11 @@ Ports the web visual identity to raw ANSI escape codes:
 
 from __future__ import annotations
 
+import shutil
 import sys
+import textwrap
 import time
 from itertools import cycle
-from typing import Optional
 
 # ANSI true-color foreground: \033[38;2;R;G;Bm
 # Reset: \033[0m
@@ -143,14 +144,23 @@ def render_flavor(level: str) -> str:
 
 
 def render_explanation(explanation: str, level: str) -> str:
-    """Render the Gemma explanation with level-appropriate styling."""
+    """Render wrapped explanation paragraphs with level-appropriate styling."""
     color, _ = level_style(level)
     out: list[str] = []
-    for para in explanation.split("\n"):
+    width = max(20, shutil.get_terminal_size(fallback=(80, 24)).columns - 2)
+    for para in explanation.splitlines():
         para = para.strip()
         if not para:
             continue
-        out.append(colorize(f"  {para}", color if supports_color() else ""))
+        wrapped = textwrap.fill(
+            para,
+            width=width,
+            initial_indent="  ",
+            subsequent_indent="  ",
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        out.append(colorize(wrapped, color if supports_color() else ""))
     return "\n".join(out)
 
 

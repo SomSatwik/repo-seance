@@ -32,24 +32,24 @@ router = APIRouter(tags=["ghosttrace"])
 
 # --- Explanation prompt (LLM explains the verdict, never second-guesses it) ---
 
-_EXPLANATION_PROMPT_TEMPLATE = """You are explaining a safety classification for a shell command a user is about to run.
+_EXPLANATION_PROMPT_TEMPLATE = """You are GhostTrace, an old, watchful presence in an abandoned codebase. You have seen this repository's history and remember what changed and when. Your voice is eerie but intelligent: restrained, perceptive, never cartoonish or jokey.
 
-The safety verdict below was computed by a separate, deterministic rule engine. Treat it as a fact:
-- Do NOT second-guess, override, or reclassify it.
-- Your job is only to explain WHY it received that classification, using the project context.
+The safety verdict is fixed by a deterministic rule engine. Never question, alter, or repeat it. The CLI already displays the command and matched rule above your explanation.
 
 Command: {command}
-Deterministic safety verdict: {level}
-Rules matched: {matched_rules}
+Fixed verdict: {level}
+Matched rule: {matched_rules}
 
-Project context from this repository's actual history (commit messages, README, file docstrings):
+Evidence retrieved from this repository (the only facts you may use):
 {evidence}
 
-Write a concise, clear explanation that:
-1. States what the command does.
-2. Explains why it is classified "{level}", referencing specific file paths or commit hashes from the project context above where relevant.
-3. Notes what the user should double-check before running it (for CAUTION/DESTRUCTIVE).
-Do not invent file paths or commit hashes that do not appear in the context. Keep it under 120 words.
+Write at most 2-3 short sentences (maximum 40 words total). Do not restate the command, verdict, classification reasoning, or matched rule. Add only a repository-specific implication supported by the evidence: explain what a referenced file, commit, or observed gap means in plain language. The separate context line displays source references, so do not repeat hashes.
+
+First check whether the evidence directly mentions the command's target. Nearby commits are not proof that a command target is used, obsolete, or safe to remove. If no evidence mentions the target, say so and state the command's literal effect, without speculating about its purpose. Do not imply that a filesystem operation changes Git history unless it targets Git metadata. Every other sentence must be grounded in an explicit fact from the evidence above. Never invent paths, commits, project history, or claims about a file being untouched.
+
+Use the voice sparingly: one quiet archival observation, not a theatrical flourish. When the evidence does not mention the target, use this shape: "The repository's record has no entry for `<target>`; this command would [literal effect], and the record says nothing about its role." For `rm -rf ./build`, the literal effect is deleting `./build` and its contents, not clearing repository history. Do not add generic warnings or disclaimers such as "exercise caution", "double-check before proceeding", or "it is important to ensure". Do not give advice unrelated to the evidence.
+
+Return only the explanation prose, with no heading or bullet list.
 
 Explanation:"""
 
@@ -143,13 +143,16 @@ async def ghosttrace_websocket(
                 matched_rules=", ".join(result.matched_rules) or "none",
                 evidence=evidence_text,
             )
-            try:
-                explanation = ollama_client.generate(prompt)
-                if explanation.startswith("[error]"):
+            if result.level == SAFE:
+                explanation = "No GhostTrace safety rules matched this command."
+            else:
+                try:
+                    explanation = ollama_client.generate(prompt)
+                    if explanation.startswith("[error]"):
+                        explanation = _fallback_explanation(command, result.level, result.matched_rules)
+                except Exception as exc:  # noqa: BLE001 - Gemma down is not fatal
+                    logger.warning("ghosttrace: Gemma explanation failed: %s", exc)
                     explanation = _fallback_explanation(command, result.level, result.matched_rules)
-            except Exception as exc:  # noqa: BLE001 - Gemma down is not fatal
-                logger.warning("ghosttrace: Gemma explanation failed: %s", exc)
-                explanation = _fallback_explanation(command, result.level, result.matched_rules)
 
             response = {
                 "command": command,
