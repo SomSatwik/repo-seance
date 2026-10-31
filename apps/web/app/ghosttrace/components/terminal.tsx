@@ -58,45 +58,8 @@ export default function Terminal({ repoId }: TerminalProps) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  useEffect(() => {
-    if (!wsRef.current) {
-      const ws = new WebSocket(`${WS_URL}/ws/ghosttrace?repo_id=${repoId}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => setConnected(true);
-      ws.onclose = () => {
-        setConnected(false);
-        wsRef.current = null;
-      };
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.error) {
-            addSystemMessage(`[error] ${data.error}`, "DESTRUCTIVE");
-            return;
-          }
-          addUserMessage(data.command);
-          addSystemMessage(data.explanation, data.level as Level, {
-            matchedRules: data.matchedRules,
-            evidence: data.evidence,
-          });
-          if (data.level === "DESTRUCTIVE") {
-            showNotification("DESTRUCTIVE", data.explanation);
-          } else if (data.level === "CAUTION") {
-            showNotification("CAUTION", data.explanation);
-          }
-        } catch (err) {
-          addSystemMessage("[error] invalid server response", "DESTRUCTIVE");
-        }
-      };
-    }
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
-  }, [repoId]);
-
   const addSystemMessage = useCallback(
-    (text: string, level?: Level, extra?: { matchedRules?: string[]; evidence?: any[] }) => {
+    (text: string, level?: Level, extra?: { matchedRules?: string[]; evidence?: unknown[] }) => {
       const id = Date.now();
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setMessages((prev) => [
@@ -118,6 +81,47 @@ export default function Terminal({ repoId }: TerminalProps) {
     setNotification({ level, message });
     setTimeout(() => setNotification(null), 6000);
   }, []);
+
+  useEffect(() => {
+    const ws = new WebSocket(`${WS_URL}/ws/ghosttrace?repo_id=${repoId}`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      if (wsRef.current === ws) setConnected(true);
+    };
+    ws.onclose = () => {
+      if (wsRef.current === ws) {
+        setConnected(false);
+        wsRef.current = null;
+      }
+    };
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          addSystemMessage(`[error] ${data.error}`, "DESTRUCTIVE");
+          return;
+        }
+        addUserMessage(data.command);
+        addSystemMessage(data.explanation, data.level as Level, {
+          matchedRules: data.matchedRules,
+          evidence: data.evidence,
+        });
+        if (data.level === "DESTRUCTIVE") {
+          showNotification("DESTRUCTIVE", data.explanation);
+        } else if (data.level === "CAUTION") {
+          showNotification("CAUTION", data.explanation);
+        }
+      } catch {
+        addSystemMessage("[error] invalid server response", "DESTRUCTIVE");
+      }
+    };
+
+    return () => {
+      if (wsRef.current === ws) wsRef.current = null;
+      ws.close();
+    };
+  }, [repoId, addSystemMessage, addUserMessage, showNotification]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
