@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@localhost:5434/reposeance"
     data_dir: Path = REPO_ROOT / "data"
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    cors_origins: str = "*"
 
     # Ingestion limits (override via env, e.g. CLONE_TIMEOUT_SECONDS=60)
     clone_timeout_seconds: int = 120

@@ -19,10 +19,10 @@ class Verdict:
 
 
 class GhostTraceClient:
-    """Thin WebSocket client over the /ws/ghosttrace endpoint.
+    """Thin client over the /ws/ghosttrace WebSocket and Repo Séance REST API.
 
-    Safety verdicts come from the backend's deterministic engine; this
-    client only transports the command and renders the response.
+    Safety verdicts come from the backend's deterministic engine; forensic
+    Q&A and history queries connect to the Repo Séance agent endpoints.
     """
 
     def __init__(self, api_url: str = "ws://localhost:8000", repo_id: str = "8") -> None:
@@ -30,6 +30,10 @@ class GhostTraceClient:
         self.repo_id = repo_id
         self.uri = f"{self.api_url}/ws/ghosttrace?repo_id={self.repo_id}"
         self._ws: Optional[websockets.ClientConnection] = None
+
+    @property
+    def http_base(self) -> str:
+        return self.api_url.replace("ws://", "http://").replace("wss://", "https://")
 
     async def connect(self) -> None:
         self._ws = await websockets.connect(self.uri, open_timeout=5)
@@ -54,3 +58,55 @@ class GhostTraceClient:
             explanation=data.get("explanation", ""),
             evidence=data.get("evidence", []),
         )
+
+    async def ask(self, question: str) -> dict:
+        """Query the forensic Q&A endpoint grounded in vector evidence."""
+        import asyncio
+        import urllib.request
+
+        url = f"{self.http_base}/repos/{self.repo_id}/ask"
+        data = json.dumps({"question": question}).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        def _fetch():
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        return await asyncio.to_thread(_fetch)
+
+    async def get_history(self) -> dict:
+        """Fetch git commit log, contributor stats, and activity gap."""
+        import asyncio
+        import urllib.request
+
+        url = f"{self.http_base}/repos/{self.repo_id}/history"
+
+        def _fetch():
+            with urllib.request.urlopen(url, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        return await asyncio.to_thread(_fetch)
+
+    async def get_roadmap(self) -> dict:
+        """Generate a recovery roadmap for the repository."""
+        import asyncio
+        import urllib.request
+
+        url = f"{self.http_base}/repos/{self.repo_id}/roadmap"
+        req = urllib.request.Request(
+            url,
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        def _fetch():
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        return await asyncio.to_thread(_fetch)

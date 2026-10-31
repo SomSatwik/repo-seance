@@ -34,3 +34,5 @@ data/
 
 # --- Logs / misc ---
 *.log
+pip-*
+pip-*/

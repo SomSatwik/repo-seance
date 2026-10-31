@@ -97,6 +97,15 @@ async def ghosttrace_websocket(
 
     await websocket.accept()
 
+    # Ambient presence banner on initial connection
+    await websocket.send_text(
+        json.dumps({
+            "event": "presence",
+            "message": f"Spirit link established with repository #{repo_id}. The ghosts are listening...",
+            "level": "SAFE",
+        })
+    )
+
     try:
         while True:
             raw = await websocket.receive_text()

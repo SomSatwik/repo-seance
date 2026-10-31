@@ -19,6 +19,8 @@ from .render import (
     DIM,
     ITALIC,
     BOLD,
+    CYAN,
+    PURPLE,
     colorize,
     render_error,
     render_connected,
@@ -28,6 +30,11 @@ from .render import (
     render_explanation,
     render_evidence,
     render_waiting,
+    render_seance_answer,
+    render_history,
+    render_gap,
+    render_roadmap,
+    render_help,
 )
 
 
@@ -48,7 +55,7 @@ def _check_backend(api_url: str) -> None:
 
 
 async def _repl(client: GhostTraceClient) -> None:
-    """REPL loop: read command, send to backend, render classification + explanation."""
+    """REPL loop: handle forensic questions, repo history/roadmap, or shell safety."""
     print(render_connected())
     print()
     while True:
@@ -65,6 +72,88 @@ async def _repl(client: GhostTraceClient) -> None:
             continue
         if command.lower() in {"exit", "quit", ":q"}:
             break
+
+        # --- Help command ---
+        if command.lower() in {"help", "--help", "-h"}:
+            print(render_help())
+            continue
+
+        # --- Séance Forensic Q&A ---
+        if command.startswith("?") or command.lower().startswith("ask ") or command.lower().startswith("seance "):
+            if command.startswith("?"):
+                question = command[1:].strip()
+            elif command.lower().startswith("ask "):
+                question = command[4:].strip()
+            else:
+                question = command[7:].strip()
+
+            if not question:
+                print(colorize("  provide a question, e.g. '? who worked on this project?'", DIM))
+                continue
+
+            show_waiting = sys.stdout.isatty()
+            if show_waiting:
+                print(colorize("  [summoning] interrogating the repository's ghosts...", CYAN), end="", flush=True)
+            try:
+                res = await client.ask(question)
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_seance_answer(question, res.get("answer", ""), res.get("citations", [])))
+            except Exception as exc:
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_error(f"séance query failed: {exc}"))
+            continue
+
+        # --- History & Contributor Stats ---
+        if command.lower() in {"history", "commits", "contributors"}:
+            show_waiting = sys.stdout.isatty()
+            if show_waiting:
+                print(colorize("  [searching] reading git logs and contributors...", CYAN), end="", flush=True)
+            try:
+                res = await client.get_history()
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_history(res.get("contributors", []), res.get("log", []), res.get("gap", {})))
+            except Exception as exc:
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_error(f"failed to fetch history: {exc}"))
+            continue
+
+        # --- Activity Gap / Dormancy ---
+        if command.lower() in {"gap", "dormancy", "dormant"}:
+            show_waiting = sys.stdout.isatty()
+            if show_waiting:
+                print(colorize("  [analyzing] computing activity gaps...", PURPLE), end="", flush=True)
+            try:
+                res = await client.get_history()
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_gap(res.get("gap", {})))
+            except Exception as exc:
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_error(f"failed to check activity gap: {exc}"))
+            continue
+
+        # --- Recovery Roadmap ---
+        if command.lower() in {"roadmap", "revive", "recovery"}:
+            show_waiting = sys.stdout.isatty()
+            if show_waiting:
+                print(colorize("  [planning] generating project recovery roadmap...", PURPLE), end="", flush=True)
+            try:
+                res = await client.get_roadmap()
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_roadmap(res.get("roadmap", ""), res.get("citations", [])))
+            except Exception as exc:
+                if show_waiting:
+                    print("\r\033[2K", end="", flush=True)
+                print(render_error(f"failed to generate roadmap: {exc}"))
+            continue
+
+        # --- GhostTrace Shell Safety Classification ---
         show_waiting = sys.stdout.isatty()
         if show_waiting:
             print(render_waiting(), end="", flush=True)

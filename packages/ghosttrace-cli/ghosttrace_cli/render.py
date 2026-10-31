@@ -26,6 +26,10 @@ RED_BOLD = "\033[1m\033[38;2;181;18;27m"
 AMBER = "\033[38;2;245;166;35m"   # #F5A623 amber (CAUTION)
 AMBER_BOLD = "\033[1m\033[38;2;245;166;35m"
 GREEN = "\033[38;2;46;204;113m"   # #2ECC71 green (connected / ready)
+CYAN = "\033[38;2;0;200;255m"      # #00C8FF cyan (seance / ask)
+CYAN_BOLD = "\033[1m\033[38;2;0;200;255m"
+PURPLE = "\033[38;2;175;82;222m"   # #AF52DE purple (roadmap / gap)
+PURPLE_BOLD = "\033[1m\033[38;2;175;82;222m"
 DIM = "\033[2m"
 ITALIC = "\033[3m"
 BOLD = "\033[1m"
@@ -218,11 +222,11 @@ def render_startup(api_url: str, repo_id: str) -> None:
     print()
     print_logo(delay=0.03)
     print()
-    print(colorize("  ghosttrace", BOLD))
+    print(colorize("  ghosttrace + repo-seance", BOLD))
     print(colorize(f"  {random.choice(STARTUP_MESSAGES)}", DIM))
     print(f"  api:     {api_url}")
     print(colorize(f"  repo:    {repo_id}", DIM))
-    print(colorize("  type a command and press enter, or Ctrl+C to exit", ITALIC))
+    print(colorize("  type '? <question>', 'history', 'gap', 'roadmap', a shell command, or 'help'", ITALIC))
     print()
 
 
@@ -232,3 +236,131 @@ def render_error(message: str) -> str:
 
 def render_connected() -> str:
     return colorize("  [connected] ready.", GREEN if supports_color() else "")
+
+
+def render_seance_answer(question: str, answer: str, citations: list[dict]) -> str:
+    """Render a grounded Q&A answer with inline source tags and citations."""
+    lines: list[str] = []
+    lines.append("")
+    lines.append(colorize("  [SÉANCE RESPONSE]", CYAN_BOLD))
+    lines.append(colorize(f"  question: {question}", DIM))
+    lines.append("")
+
+    width = max(20, shutil.get_terminal_size(fallback=(80, 24)).columns - 2)
+    for para in answer.splitlines():
+        para = para.strip()
+        if not para:
+            continue
+        wrapped = textwrap.fill(
+            para,
+            width=width,
+            initial_indent="  ",
+            subsequent_indent="  ",
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        lines.append(wrapped)
+
+    if citations:
+        lines.append("")
+        refs = [f"{c.get('source_type')}:{c.get('source_ref')}" for c in citations if c.get("source_type")]
+        lines.append(colorize(f"  citations: {', '.join(refs)}", CYAN))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_history(contributors: list[dict], log: list[dict], gap: dict) -> str:
+    """Render repository commit history, top contributors, and activity gap."""
+    lines: list[str] = []
+    lines.append("")
+    lines.append(colorize("  [REPOSITORY HISTORY]", CYAN_BOLD))
+
+    # Activity gap
+    if gap and gap.get("message"):
+        lines.append(colorize(f"  gap: {gap['message']}", PURPLE))
+    lines.append("")
+
+    # Contributors
+    lines.append(colorize("  Top Contributors:", BOLD))
+    for c in contributors[:5]:
+        author = c.get("author", "unknown")
+        count = c.get("commit_count", 0)
+        lines.append(f"    - {author}: {count} commit{'s' if count != 1 else ''}")
+    lines.append("")
+
+    # Recent commits
+    lines.append(colorize(f"  Recent Commits ({len(log[:5])} of {len(log)}):", BOLD))
+    for commit in log[:5]:
+        sh = commit.get("short_hash", "")[:8]
+        msg = (commit.get("message", "") or "").splitlines()[0][:60]
+        author = commit.get("author", "")
+        lines.append(f"    {colorize(sh, DIM)} {msg} {colorize(f'({author})', DIM)}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_gap(gap: dict) -> str:
+    """Render development gap analysis."""
+    lines: list[str] = []
+    lines.append("")
+    lines.append(colorize("  [ACTIVITY GAP]", PURPLE_BOLD))
+    msg = gap.get("message", "No activity gap detected.")
+    days = gap.get("days", 0)
+    lines.append(f"  {msg}")
+    if days and days > 0:
+        lines.append(colorize(f"  (Repository was dormant for approximately {days:.1f} days)", DIM))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_roadmap(roadmap: str, citations: list[dict]) -> str:
+    """Render repository recovery roadmap."""
+    lines: list[str] = []
+    lines.append("")
+    lines.append(colorize("  [RECOVERY ROADMAP]", PURPLE_BOLD))
+    lines.append("")
+
+    width = max(20, shutil.get_terminal_size(fallback=(80, 24)).columns - 2)
+    for para in roadmap.splitlines():
+        para = para.strip()
+        if not para:
+            continue
+        wrapped = textwrap.fill(
+            para,
+            width=width,
+            initial_indent="  ",
+            subsequent_indent="  ",
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        lines.append(wrapped)
+
+    if citations:
+        lines.append("")
+        refs = [f"{c.get('source_type')}:{c.get('source_ref')}" for c in citations if c.get("source_type")]
+        lines.append(colorize(f"  evidence cited: {', '.join(refs)}", DIM))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_help() -> str:
+    """Render CLI command guide."""
+    lines: list[str] = []
+    lines.append("")
+    lines.append(colorize("  GHOSTTRACE + REPO SÉANCE COMMANDS", BOLD))
+    lines.append("")
+    lines.append(f"  {colorize('? <question>', CYAN)} or {colorize('ask <question>', CYAN)}")
+    lines.append("      Summon repository ghosts — Ask forensic questions grounded in git memory.")
+    lines.append(f"  {colorize('history', CYAN)} or {colorize('contributors', CYAN)}")
+    lines.append("      View commit log, contributor leaderboard, and active timeline.")
+    lines.append(f"  {colorize('gap', PURPLE)}")
+    lines.append("      Inspect detected development dormancy and activity gaps.")
+    lines.append(f"  {colorize('roadmap', PURPLE)}")
+    lines.append("      Generate an AI-driven project revival and recovery roadmap.")
+    lines.append(f"  {colorize('<shell command>', RED)}")
+    lines.append("      Test any shell command (e.g. 'rm -rf ./build') for pre-flight safety verdicts.")
+    lines.append(f"  {colorize('exit', DIM)} or {colorize('quit', DIM)}")
+    lines.append("      Exit the session.")
+    lines.append("")
+    return "\n".join(lines)
+

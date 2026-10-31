@@ -27,7 +27,7 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const WS_URL = API_URL.replace(/^http/, "ws");
 
-type Level = "SAFE" | "CAUTION" | "DESTRUCTIVE";
+type Level = "SAFE" | "CAUTION" | "DESTRUCTIVE" | "INFO" | "SEANCE";
 
 interface Message {
   id: number;
@@ -87,7 +87,13 @@ export default function Terminal({ repoId }: TerminalProps) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      if (wsRef.current === ws) setConnected(true);
+      if (wsRef.current === ws) {
+        setConnected(true);
+        addSystemMessage(
+          "GhostTrace + Repo Séance unified terminal ready. Type '? <question>', 'history', 'gap', 'roadmap', a shell command, or 'help'.",
+          "SAFE"
+        );
+      }
     };
     ws.onclose = () => {
       if (wsRef.current === ws) {
@@ -123,12 +129,113 @@ export default function Terminal({ repoId }: TerminalProps) {
     };
   }, [repoId, addSystemMessage, addUserMessage, showNotification]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cmd = input.trim();
-    if (!cmd || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ command: cmd }));
+    if (!cmd) return;
     setInput("");
+
+    // --- Help command ---
+    if (cmd.toLowerCase() === "help") {
+      addUserMessage(cmd);
+      addSystemMessage(
+        `GHOSTTRACE + REPO SÉANCE COMMANDS:\n\n` +
+        `  ? <question> or ask <question>\n` +
+        `    Interrogate repository history with AI & citations\n\n` +
+        `  history or contributors\n` +
+        `    View commit log, active timeline, and top authors\n\n` +
+        `  gap\n` +
+        `    Check development dormancy & activity gaps\n\n` +
+        `  roadmap\n` +
+        `    Synthesize a recovery and revival roadmap\n\n` +
+        `  <shell command> (e.g. 'rm -rf ./build')\n` +
+        `    Test any command for pre-flight safety verdicts`,
+        "INFO"
+      );
+      return;
+    }
+
+    // --- Séance Forensic Q&A ---
+    if (cmd.startsWith("?") || cmd.toLowerCase().startsWith("ask ") || cmd.toLowerCase().startsWith("seance ")) {
+      addUserMessage(cmd);
+      const question = cmd.startsWith("?") ? cmd.slice(1).trim() : cmd.split(" ").slice(1).join(" ").trim();
+      if (!question) {
+        addSystemMessage("Please provide a question, e.g. '? Who created this project?'", "CAUTION");
+        return;
+      }
+      const waitingId = addSystemMessage("Interrogating repository ghosts...", "SEANCE");
+      try {
+        const res = await fetch(`${API_URL}/repos/${repoId}/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        const citations = data.citations?.map((c: { source_type: string; source_ref: string }) => `[${c.source_type}:${c.source_ref}]`).join(", ");
+        const text = `${data.answer}${citations ? `\n\nCitations: ${citations}` : ""}`;
+        setMessages(prev => prev.filter(m => m.id !== waitingId));
+        addSystemMessage(text, "SEANCE");
+      } catch (err) {
+        setMessages(prev => prev.filter(m => m.id !== waitingId));
+        addSystemMessage(`[error] failed to reach séance: ${err}`, "DESTRUCTIVE");
+      }
+      return;
+    }
+
+    // --- History & Contributor Stats ---
+    if (cmd.toLowerCase() === "history" || cmd.toLowerCase() === "contributors") {
+      addUserMessage(cmd);
+      try {
+        const res = await fetch(`${API_URL}/repos/${repoId}/history`);
+        const data = await res.json();
+        const topContribs = data.contributors?.slice(0, 5).map((c: { author: string; commit_count: number }) => `  - ${c.author}: ${c.commit_count} commits`).join("\n") || "  None";
+        const recentCommits = data.log?.slice(0, 5).map((c: { short_hash: string; message: string; author: string }) => `  [${c.short_hash}] ${c.message?.split('\n')[0]} (${c.author})`).join("\n") || "  None";
+        const text = `TOP CONTRIBUTORS:\n${topContribs}\n\nRECENT COMMITS:\n${recentCommits}${data.gap?.message ? `\n\n${data.gap.message}` : ""}`;
+        addSystemMessage(text, "INFO");
+      } catch (err) {
+        addSystemMessage(`[error] failed to fetch history: ${err}`, "DESTRUCTIVE");
+      }
+      return;
+    }
+
+    // --- Activity Gap / Dormancy ---
+    if (cmd.toLowerCase() === "gap" || cmd.toLowerCase() === "dormancy") {
+      addUserMessage(cmd);
+      try {
+        const res = await fetch(`${API_URL}/repos/${repoId}/history`);
+        const data = await res.json();
+        addSystemMessage(data.gap?.message || "No activity gap detected.", "INFO");
+      } catch (err) {
+        addSystemMessage(`[error] failed to fetch gap: ${err}`, "DESTRUCTIVE");
+      }
+      return;
+    }
+
+    // --- Recovery Roadmap ---
+    if (cmd.toLowerCase() === "roadmap" || cmd.toLowerCase() === "revive") {
+      addUserMessage(cmd);
+      const waitingId = addSystemMessage("Synthesizing project recovery roadmap...", "INFO");
+      try {
+        const res = await fetch(`${API_URL}/repos/${repoId}/roadmap`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await res.json();
+        setMessages(prev => prev.filter(m => m.id !== waitingId));
+        addSystemMessage(data.roadmap || "No roadmap generated.", "INFO");
+      } catch (err) {
+        setMessages(prev => prev.filter(m => m.id !== waitingId));
+        addSystemMessage(`[error] failed to generate roadmap: ${err}`, "DESTRUCTIVE");
+      }
+      return;
+    }
+
+    // --- GhostTrace Shell Safety Classification ---
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      addSystemMessage("[error] WebSocket disconnected", "DESTRUCTIVE");
+      return;
+    }
+    wsRef.current.send(JSON.stringify({ command: cmd }));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -143,6 +250,10 @@ export default function Terminal({ repoId }: TerminalProps) {
         return "gt-caution border-l-4 border-l-[var(--gt-caution)] pl-3";
       case "SAFE":
         return "gt-safe border-l-2 border-l-[var(--gt-safe)] pl-3";
+      case "SEANCE":
+        return "border-l-2 border-l-[#00c8ff] text-[#e0f7ff] pl-3";
+      case "INFO":
+        return "border-l-2 border-l-[#af52de] text-[#f3e8ff] pl-3";
       default:
         return "";
     }
@@ -156,6 +267,10 @@ export default function Terminal({ repoId }: TerminalProps) {
         return "CAUTION";
       case "SAFE":
         return "SAFE";
+      case "SEANCE":
+        return "SÉANCE";
+      case "INFO":
+        return "FORENSICS";
       default:
         return "";
     }
@@ -245,7 +360,7 @@ export default function Terminal({ repoId }: TerminalProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command…"
+            placeholder="Type a command, or '? <question>', 'history', 'gap', 'roadmap', 'help'..."
             className="flex-1 bg-transparent border-none outline-none text-[var(--gt-fg)] font-mono text-sm placeholder-[var(--gt-muted)] w-full"
             disabled={!connected}
           />
