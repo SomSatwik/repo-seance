@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import CrtOverlay from "./crt-overlay";
@@ -90,7 +90,7 @@ export default function Terminal({ repoId }: TerminalProps) {
   useEffect(() => {
     const apiBase = getApiUrl();
     const wsBase = apiBase.replace(/^http/, "ws");
-    const ws = new WebSocket(`${wsBase}/ws/ghosttrace?repo_id=${repoId}`);
+    const ws = new WebSocket(`${getWsUrl()}/ws/ghosttrace?repo_id=${repoId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {

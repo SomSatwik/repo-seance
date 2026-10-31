@@ -59,6 +59,33 @@
   .gt-safe {
     color: var(--gt-safe);
   }
+
+  .font-creepster {
+    font-family: var(--font-creepster), cursive, sans-serif;
+  }
+  .font-medieval {
+    font-family: var(--font-medieval), Georgia, serif;
+  }
+  .ff-glow-green {
+    color: #9ef368;
+    text-shadow: 0 0 8px rgba(158, 243, 104, 0.8), 0 0 20px rgba(158, 243, 104, 0.4);
+  }
+  .ff-glow-cyan {
+    color: #5ce1e6;
+    text-shadow: 0 0 10px rgba(92, 225, 230, 0.6);
+  }
+  .ff-ribbon {
+    background: linear-gradient(180deg, #1c3c43 0%, #0e2227 50%, #061114 100%);
+    border: 1px solid #2d5d67;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 8px 25px rgba(0, 0, 0, 0.9);
+  }
+  .ff-night-bg {
+    background-color: #04080a;
+    background-image: 
+      radial-gradient(circle at 50% 35%, rgba(28, 75, 65, 0.4) 0%, transparent 65%),
+      radial-gradient(circle at 85% 25%, rgba(20, 90, 100, 0.25) 0%, transparent 50%),
+      linear-gradient(180deg, #051014 0%, #03080b 60%, #010406 100%);
+  }
 }
 
 @layer utilities {

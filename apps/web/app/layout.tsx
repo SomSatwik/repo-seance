@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Creepster, MedievalSharp } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,16 +12,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const creepster = Creepster({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-creepster",
+});
+
+const medieval = MedievalSharp({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-medieval",
+});
+
 export const metadata: Metadata = {
-  title: "Repo Séance",
-  description: "Summon the spirit of any git repository.",
+  title: "Repo Séance — Haunted Codebases & Forensic Ghosts",
+  description: "Find and interrogate haunted repositories, dormant git histories, and forensic code ghosts.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${creepster.variable} ${medieval.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
