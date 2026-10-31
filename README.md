@@ -35,7 +35,7 @@ decision log.
 - Docker Desktop (with Compose v5+)
 - Python 3.12
 - Node.js 20+ and pnpm 10+
-- (Optional) NVIDIA GPU + Ollama for local inference
+- Ollama for local inference (GPU optional; `gemma2:2b` can run on CPU)
 
 ## Setup
 
@@ -65,7 +65,27 @@ uvicorn main:app --reload --port 8000
 
 Health check: http://localhost:8000/health
 
-### 3. Web
+### 3. Local models (Ollama)
+
+Install Ollama for Windows from <https://ollama.com/download/windows>, start
+the Ollama app/service, then download the models used by this project:
+
+```powershell
+ollama pull gemma2:2b
+ollama pull nomic-embed-text
+```
+
+The API defaults to `gemma2:2b` for explanations and `nomic-embed-text` for
+embeddings. Both run locally after their model weights are downloaded; an
+NVIDIA GPU is optional. The tested RTX 4050 has 6 GB VRAM, so the 2B Gemma
+model is the practical choice here. This machine reported CPU inference, with
+about 23 seconds per generation in the recorded run.
+
+The default `CLONE_DEPTH=0` keeps full history for the default branch. Set a
+positive depth in `.env` to make shallow clones when faster, smaller imports
+matter more than older history.
+
+### 4. Web
 
 ```powershell
 cd apps/web
@@ -75,7 +95,31 @@ pnpm dev
 
 Open http://localhost:3000 — the homepage fetches the API `/health` endpoint live.
 
+### GhostTrace (opt-in)
+
+Set `GHOSTTRACE_ENABLED=true` in the root `.env` to enable the project-scoped
+GhostTrace endpoint. Keep `GHOSTTRACE_PROJECT_SCOPE_ONLY=true` to limit
+retrieved context to the selected repository. Install the CLI from the repo
+root with `pip install -e packages/ghosttrace-cli`, then run
+`ghosttrace --repo <repo-id>` while the API is running.
+
+### Optional Sentry
+
+Set `SENTRY_DSN` in the root `.env` to enable API error reporting and Ollama
+generation spans. No DSN is required for local development; Sentry is disabled
+when the setting is empty. Prompts and local variables are not sent as Sentry
+event data.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored and
 must **never** be committed.
+
+## Offline behavior
+
+After dependencies and model weights are installed and a repository has been
+ingested, the API, Postgres/pgvector retrieval, and Gemma explanations run
+locally without a network connection. Importing a repository from GitHub
+requires internet access; downloading Python/Node dependencies and Ollama model
+weights also requires internet access unless already cached. Optional Sentry
+delivery requires network access and a configured DSN.

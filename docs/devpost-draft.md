@@ -1,97 +1,128 @@
-# DevPost Draft — Repo Séance (Sprint 1 running notes)
+# Repo Séance: Code Archaeology for Abandoned Repositories
 
-> Highest-weighted judging criterion. Updated live during the build — never
-> reconstructed from memory at hour 8.
+When a repository goes quiet, the source code alone rarely explains why.
+Important context is scattered across commit messages, contributors, README
+files, and the structure of the project. Repo Séance turns those traces into
+evidence-backed answers—and adds GhostTrace, a local terminal companion that
+warns before risky shell commands.
 
-## Sprint 1: Core Intelligence
+## The insight: history is evidence, not metadata
 
-### Part A — Git history analyzer (`apps/api/history/`)
-- Built `get_commit_log()` — returns commits with hash, author, date, message using GitPython on the already-cloned repo path.
-- Built `get_contributor_stats()` — commit counts per author + first/last commit dates.
-- Built `detect_activity_gaps()` — largest gap in commit dates; this is the "development stopped here" signal used by `/roadmap`.
-- Built `blame_file(path)` — git blame output for a given file.
-- Alembic migration `0002` added `commits` table linked to `repositories`: hash, author, date, message, files_changed.
-- Added `GET /repos/{id}/history` returning log + contributor stats + detected gap.
-- Wired history collection into ingestion pipeline (runs after clone, persists commits).
-- Tested against the real repo-seance repo — 12 commits, 1 contributor, 1-day gap detected, blame works.
-- **Technical decision**: used GitPython (already a dependency) rather than shelling out to `git` CLI, keeps the API pure Python and consistent with existing clone.py.
+Git history is more than a timeline. It records who changed a project, what
+they worked on, and where activity stopped. Repo Séance indexes that history
+alongside repository files so answers can point back to concrete commits and
+paths instead of sounding plausible without support.
 
-### Part B — Ollama + Gemma integration
-- Ollama installed (0.40.13) at C:\Users\ssoms\AppData\Local\Programs\Ollama\. Server on localhost:11434.
-- Disk issue: D: drive (default Ollama model store) was full → moved model store to `C:\Users\ssoms\OneDrive\Desktop\som\OllamaModels` via `OLLAMA_MODELS` env var + server restart.
-- `gemma2:2b` pulled (~1.6 GB) + `nomic-embed-text` pulled (274 MB).
-- `GET /system/status` returns `ollama_reachable:true`, model `gemma2:2b`, inference mode `CPU` (detected via Ollama `/api/ps`, NOT hardcoded).
-- Real Gemma 2B generate() call: coherent response, **latency ~23 seconds** on CPU — honest demo pacing number.
-- `OLLAMA_MODEL=gemma2:2b` and `OLLAMA_EMBED_MODEL=nomic-embed-text` configured in `.env`.
+The GhostTrace extension applies a related principle to command safety: the
+verdict must be dependable before an explanation is generated. A deterministic
+rule engine classifies a command as `SAFE`, `CAUTION`, or `DESTRUCTIVE`.
+Gemma can explain the result using repository context, but it never chooses or
+overrides the verdict. The CLI sends command text to the API; it does not run
+the command.
 
-### Part C — Evidence retrieval
-- Embedding model: `nomic-embed-text` via Ollama embedding API.
-- Alembic migration `0002` added `evidence` table with pgvector `Vector(768)` column.
-- `retrieve_evidence(query, repo_id, k=5)` does cosine similarity via pgvector `<=>`.
-- Indexed commit messages, README, and top-level file docstrings.
-- **Verified**: `retrieve_evidence` returns real chunks for a real query (commit hash `7fd1a60b` surfaced).
-- **Technical decision**: single table with `source_type` discriminator rather than separate tables — keeps schema minimal.
+## How it works
 
-### Part D — Grounded Q&A + recovery roadmap
-- `POST /repos/{id}/ask` — retrieves evidence via pgvector, builds Gemma prompt with actual file paths/commit hashes, requires citations.
-- `POST /repos/{id}/roadmap` — prioritized recovery roadmap grounded in activity gap + contributor stats + structure scan.
-- ✅ Verified: `/ask` answer "The first commit was [commit:7fd1a60b]..." contains real commit hash from retrieval (NOT plausible-sounding prose). `/roadmap` returns real `[ACTIVITY_GAP]`/`[TOP_CONTRIBUTORS]` citations. Gate for Sprint 2 PASSED.
-- **Technical decision**: citations appended as bracketed refs `[commit:abc123]` / `[file:src/foo.py]` parsed from retrieved rows.
+```mermaid
+flowchart LR
+  A[Git repository] --> B[FastAPI ingestion]
+  B --> C[Git history + tree-sitter structure]
+  B --> D[Postgres + pgvector evidence]
+  E[Question] --> F[Evidence retrieval]
+  D --> F
+  F --> G[Ollama + Gemma explanation]
+  H[ghosttrace CLI] --> I[GhostTrace WebSocket]
+  I --> J[Deterministic safety rules]
+  J --> K[Grounded Gemma explanation]
+  D --> K
+```
 
-### Latency numbers (Gemma 2B, CPU)
-- generate(): ~23 seconds per call (honest — affects demo pacing)
-- embed: fast (batch embedding during ingestion)
+Ingestion clones a repository, records commit history and contributor
+statistics, scans its structure, extracts symbols, and indexes selected
+evidence. The `/ask` endpoint retrieves relevant evidence with pgvector and
+asks the local model to cite real file paths and commit hashes. The CLI and
+browser preview both use the same GhostTrace WebSocket, safety rules, and
+explanation path.
 
-### Minimal dashboard
-- [ ] Next.js page: repo URL input → ingestion status → tabs (Architecture, History, Ask, Roadmap). No interactive graph (Sprint 2).
+## Engineering decisions
 
-### Push checkpoints
-- [x] Pushed to GitHub at natural checkpoints: `bb28dc3` + `1e6b6f2` — https://github.com/SomSatwik/repo-seance
+- **A compatible parser stack:** `tree-sitter` stays pinned to `0.21.3`
+  because `tree-sitter-languages` 1.10.2 depends on that API. Upgrading the
+  parser broke the existing language-package integration.
+- **History by default:** the first clean demo import used a one-commit
+  shallow clone, which hid the chronology the tool is meant to explain. The
+  default now keeps the full history of the default branch; setting
+  `CLONE_DEPTH` to a positive number opts back into a shallow clone.
+- **Windows-safe clone cleanup:** Git pack files can be read-only on Windows.
+  Cleanup clears the read-only attribute before retrying deletion, preventing
+  a failed or oversized clone from leaving a half-removed worktree behind.
+- **Safety before language generation:** GhostTrace's verdict is computed
+  deterministically before any model call. This keeps command classification
+  available even when Ollama is stopped and prevents a model from softening a
+  dangerous result.
+- **A model that fits the machine:** `gemma2:2b` is the practical local model
+  for the tested RTX 4050 with 6 GB VRAM. This machine reported CPU inference,
+  at roughly 23 seconds per generation; the demo allows that response time
+  rather than hiding it.
+- **Two interfaces, one product path:** the horror-styled web terminal is a
+  visual preview, while `pip install -e packages/ghosttrace-cli` installs the
+  actual `ghosttrace` command. Both call the same backend instead of
+  duplicating rules in the client.
 
-## Sprint 2: GhostTrace — Terminal Companion + Horror Identity
+## Demo walkthrough
 
-### Part A — Deterministic safety engine (`apps/api/ghosttrace/safety_rules.py`)
-- Rule-based (NOT LLM-based) shell command classifier using regex with word boundaries.
-- Classifies commands: SAFE / CAUTION / DESTRUCTIVE.
-- DESTRUCTIVE patterns: `rm -rf/fr`, `rd /s`, `git reset --hard`, `git push --force/-f`, `git clean -fdx`, `DROP TABLE/DATABASE`, `TRUNCATE`, `chmod -R 777`, `curl|sh`, `wget|bash`, `dd of=/dev/`.
-- CAUTION patterns: plain `rm`, `git reset` (no --hard), `git checkout/switch`, `chmod`, `mv`, redirect overwrite, `dd`, `git clean`.
-- Unit tests (`tests/test_safety_rules.py`, 69 cases) cover positive matches AND negative "looks similar but isn't" cases (`rm -ri`, `git reset --soft`, `git push` plain, `chmod 755`, `rmdir`, etc.). ALL PASS.
-- Aggressive-by-design: `DROP TABLE` flagged even in comments (missed destructive > false positive).
-- Works with zero LLM calls — module imports only `re`/`dataclasses`, confirmed by running tests with Ollama stopped.
+The rehearsal imported the public repository fresh with full history. The
+import completed with 18 commits. A composite question about what happened to
+the project and who worked on it returned citations to its README and a real
+commit. Then the CLI classified three commands live:
 
+```text
+rm -rf ./build   -> DESTRUCTIVE
+rm old_note.txt  -> CAUTION
+ls -la           -> SAFE
+```
 
-### Part B — Command interception + contextual explanation (`apps/api/ghosttrace/router.py`)
-- WebSocket endpoint `/ws/ghosttrace?repo_id={id}` — client sends a command, server returns safety classification + Gemma explanation.
-- Safety verdict computed by deterministic engine BEFORE any LLM call — Gemma only explains, never second-guesses (enforced in code structure).
-- Gemma pulls real context from Sprint 1's evidence/history layer (commit hashes, file paths) for grounded explanations.
-- Explicitly opt-in via `GHOSTTRACE_ENABLED` and project-scoped via `GHOSTTRACE_PROJECT_SCOPE_ONLY` — only sees current repo, not the whole machine.
-- Verified with real commands: safe (`ls -la`), caution (`rm old_note.txt`), destructive (`rm -rf ./build`, `git reset --hard HEAD`) — all explanations cite real commit `7fd1a60b`.
+Each result included evidence references from the imported repository, such
+as `commit:60186a9a` and `commit:fbca8b87`. Those hashes are examples from the
+rehearsal, not permanent identifiers.
 
+The browser terminal remains useful as a quick visual preview; the installable
+CLI is the command-line product used for the safety demonstration.
 
-### Part C — Horror visual identity (`apps/web/app/ghosttrace/`)
-- Distinct terminal-style view, separate feel from clean Repo Séance dashboard.
-- Palette: near-black `#050505` bg, blood-red `#B5121B` accent, Geist_Mono monospace throughout.
-- Custom original ASCII logo (ghost heads + terminal cursor `||█||`), line-by-line startup reveal.
-- CRT scanline + vignette overlay, flickering cursor, rare glitch on state changes (subtle, tested on second viewing).
-- Warning states: DESTRUCTIVE = red animated pulse, CAUTION = amber pulse, SAFE = understated.
-- Ghost-themed notification banner distinct from generic chat bubble.
-- Working terminal: command input, scrollback, readable monospace output, live WebSocket status.
-- Deliberate transition: homepage link "Open GhostTrace terminal" shifts tone without being jarring.
-- `GHOSTTRACE_ENABLED` flag genuinely gates the feature (verified both states).
+![GhostTrace browser terminal preview](screenshots/ghosttrace-terminal.png)
 
-## Sprint 2b: Installable GhostTrace CLI
+*The browser preview shows the live WebSocket status and terminal styling.
+The demo's command classifications are run through the installable CLI.*
 
-- Added `packages/ghosttrace-cli`, a Python package installed as the `ghosttrace` command.
-- The CLI connects to the existing `/ws/ghosttrace` WebSocket and renders the backend's deterministic verdict and Gemma-grounded explanation; it contains no duplicated safety rules or explanation logic.
-- Ported the horror identity to ANSI terminal output: blood-red DESTRUCTIVE, amber CAUTION, and understated dim SAFE, with the original ASCII logo revealed line by line.
-- Kept both surfaces for distinct purposes: the web terminal is the browser-based demo/preview, while the CLI is the actual installable terminal product. They share the same backend and therefore the same safety behavior.
+## What is implemented—and what is not
 
-## Sprint 1 COMPLETE
+Implemented: repository cloning and structure analysis; commit and contributor
+history; symbol extraction; pgvector evidence retrieval; cited `/ask`
+responses; an experimental `/roadmap` endpoint; and GhostTrace's deterministic
+classifier, grounded explanation, WebSocket, browser preview, and installable
+CLI.
 
-All completion criteria met:
-- [x] Real commit history stored and queryable, gap detection works on real repo
-- [x] Gemma reachable via Ollama, model/inference-mode genuinely detected (CPU) not hardcoded
-- [x] pgvector retrieval returns real evidence for a real query
-- [x] `/ask` and `/roadmap` responses contain real citations from the repo (verified by reading actual output)
-- [x] `docs/devpost-draft.md` has running notes from this sprint
-- [x] Commits incremental, pushed to GitHub at natural checkpoints
+The `/roadmap` endpoint is not part of the demo because its live output gave
+generic recommendations and incorrectly described the repository as a
+GhostTrace project. It needs better grounding before being presented as a
+reliable project roadmap.
+
+Explicitly descoped for this sprint: ZIP upload, Render deployment, and full
+hybrid retrieval. Retrieval currently uses pgvector semantic evidence plus
+separate history-derived signals; it does not combine vector and keyword
+search with a hybrid ranking strategy. There is no hosted demo deployment.
+
+Sentry instrumentation is optional and reads its DSN from `.env`. The local
+instrumentation was verified with an in-memory Sentry transport, including a
+captured model-call span and a sanitized failure event. No Sentry project DSN
+was configured during rehearsal, so delivery to a remote Sentry dashboard has
+not been verified.
+
+## What works offline
+
+After dependencies and model weights have been downloaded and a repository is
+already available locally, the API, Postgres/pgvector retrieval, GhostTrace
+classification, and Gemma explanations run on the local machine without a
+network connection. Cloning a repository from GitHub requires internet
+access. Initial dependency and model downloads also require internet unless
+they are already cached. Optional Sentry event delivery requires a configured
+DSN and network access.
