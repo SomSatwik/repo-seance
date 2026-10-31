@@ -17,33 +17,43 @@
 - **Technical decision**: used GitPython (already a dependency) rather than shelling out to `git` CLI, keeps the API pure Python and consistent with existing clone.py.
 
 ### Part B — Ollama + Gemma integration
-- Ollama installed (0.40.13) at C:\Users\ssoms\AppData\Local\Programs\Ollama\. Server running on localhost:11434.
-- `gemma2:2b` pull IN PROGRESS (~99 MB / 1.6 GB at ~3 MB/s, ~8 min remaining). Not 9B — fits 6GB VRAM.
-- Built `apps/api/agent/client.py` thin wrapper over Ollama `/api/generate`: `generate(prompt, context)` with model from `OLLAMA_MODEL` env var. Also has `embed()` and `status()`.
-- Added `GET /system/status` reporting model name, inference mode (GPU/CPU via Ollama `/api/ps`), and Ollama reachability — not hardcoded. Endpoint returns `ollama_reachable:false` until Gemma is loaded.
-- Real test call to Gemma: PENDING (blocked on Gemma download).
-- `OLLAMA_MODEL=gemma2:2b` configured in `.env`.
-- **Technical decision**: `/api/generate` over `/api/chat` for simplicity; single-turn prompts don't need conversation state today.
+- Ollama installed (0.40.13) at C:\Users\ssoms\AppData\Local\Programs\Ollama\. Server on localhost:11434.
+- Disk issue: D: drive (default Ollama model store) was full → moved model store to `C:\Users\ssoms\OneDrive\Desktop\som\OllamaModels` via `OLLAMA_MODELS` env var + server restart.
+- `gemma2:2b` pulled (~1.6 GB) + `nomic-embed-text` pulled (274 MB).
+- `GET /system/status` returns `ollama_reachable:true`, model `gemma2:2b`, inference mode `CPU` (detected via Ollama `/api/ps`, NOT hardcoded).
+- Real Gemma 2B generate() call: coherent response, **latency ~23 seconds** on CPU — honest demo pacing number.
+- `OLLAMA_MODEL=gemma2:2b` and `OLLAMA_EMBED_MODEL=nomic-embed-text` configured in `.env`.
 
 ### Part C — Evidence retrieval
-- Embedding model: `nomic-embed-text` via Ollama embedding API (small, fast, local).
-- Alembic migration `0002` added `evidence` table with pgvector column: repo_id, content, source_type, source_ref, embedding.
-- `retrieve_evidence(query, repo_id, k=5)` does cosine similarity via pgvector `<=>` operator.
-- Indexed commit messages + README + top-level file docstrings.
-- **Technical decision**: single table with `source_type` discriminator (commit/readme/file) rather than separate tables — keeps schema minimal and query uniform.
+- Embedding model: `nomic-embed-text` via Ollama embedding API.
+- Alembic migration `0002` added `evidence` table with pgvector `Vector(768)` column.
+- `retrieve_evidence(query, repo_id, k=5)` does cosine similarity via pgvector `<=>`.
+- Indexed commit messages, README, and top-level file docstrings.
+- **Verified**: `retrieve_evidence` returns real chunks for a real query (commit hash `7fd1a60b` surfaced).
+- **Technical decision**: single table with `source_type` discriminator rather than separate tables — keeps schema minimal.
 
 ### Part D — Grounded Q&A + recovery roadmap
 - `POST /repos/{id}/ask` — retrieves evidence via pgvector, builds Gemma prompt with actual file paths/commit hashes, requires citations.
-- `POST /repos/{id}/roadmap` — prioritized recovery roadmap grounded in activity gap + contributor stats + TODO/FIXME from structure scan.
-- [ ] Verified answers contain real file paths/commit hashes from retrieval (NOT plausible-sounding prose).
+- `POST /repos/{id}/roadmap` — prioritized recovery roadmap grounded in activity gap + contributor stats + structure scan.
+- ✅ Verified: `/ask` answer "The first commit was [commit:7fd1a60b]..." contains real commit hash from retrieval (NOT plausible-sounding prose). `/roadmap` returns real `[ACTIVITY_GAP]`/`[TOP_CONTRIBUTORS]` citations. Gate for Sprint 2 PASSED.
 - **Technical decision**: citations appended as bracketed refs `[commit:abc123]` / `[file:src/foo.py]` parsed from retrieved rows.
+
+### Latency numbers (Gemma 2B, CPU)
+- generate(): ~23 seconds per call (honest — affects demo pacing)
+- embed: fast (batch embedding during ingestion)
 
 ### Minimal dashboard
 - [ ] Next.js page: repo URL input → ingestion status → tabs (Architecture, History, Ask, Roadmap). No interactive graph (Sprint 2).
 
-### Latency numbers (Gemma 2B)
-- generate(): [BLOCKED — Ollama install download repeatedly fails (connection aborted by host); will retry. Gemma 2B not yet pulled.]
-- embed: [BLOCKED — same]
-
 ### Push checkpoints
-- [x] Pushed to GitHub at natural checkpoints: `bb28dc3` (Sprint 1 core: history + agent + retrieval + ask/roadmap) — https://github.com/SomSatwik/repo-seance
+- [x] Pushed to GitHub at natural checkpoints: `bb28dc3` + `1e6b6f2` — https://github.com/SomSatwik/repo-seance
+
+## Sprint 1 COMPLETE
+
+All completion criteria met:
+- [x] Real commit history stored and queryable, gap detection works on real repo
+- [x] Gemma reachable via Ollama, model/inference-mode genuinely detected (CPU) not hardcoded
+- [x] pgvector retrieval returns real evidence for a real query
+- [x] `/ask` and `/roadmap` responses contain real citations from the repo (verified by reading actual output)
+- [x] `docs/devpost-draft.md` has running notes from this sprint
+- [x] Commits incremental, pushed to GitHub at natural checkpoints
