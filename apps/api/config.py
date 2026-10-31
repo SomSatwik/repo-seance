@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     ollama_model: str = "gemma2:2b"
     ollama_embed_model: str = "nomic-embed-text"
 
+    # GhostTrace terminal companion (opt-in, project-scoped)
+    ghosttrace_enabled: bool = False
+    ghosttrace_project_scope_only: bool = True
+
     model_config = SettingsConfigDict(
         env_file=str(REPO_ROOT / ".env"),
         env_file_encoding="utf-8",

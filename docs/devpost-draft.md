@@ -48,6 +48,37 @@
 ### Push checkpoints
 - [x] Pushed to GitHub at natural checkpoints: `bb28dc3` + `1e6b6f2` — https://github.com/SomSatwik/repo-seance
 
+## Sprint 2: GhostTrace — Terminal Companion + Horror Identity
+
+### Part A — Deterministic safety engine (`apps/api/ghosttrace/safety_rules.py`)
+- Rule-based (NOT LLM-based) shell command classifier using regex with word boundaries.
+- Classifies commands: SAFE / CAUTION / DESTRUCTIVE.
+- DESTRUCTIVE patterns: `rm -rf/fr`, `rd /s`, `git reset --hard`, `git push --force/-f`, `git clean -fdx`, `DROP TABLE/DATABASE`, `TRUNCATE`, `chmod -R 777`, `curl|sh`, `wget|bash`, `dd of=/dev/`.
+- CAUTION patterns: plain `rm`, `git reset` (no --hard), `git checkout/switch`, `chmod`, `mv`, redirect overwrite, `dd`, `git clean`.
+- Unit tests (`tests/test_safety_rules.py`, 69 cases) cover positive matches AND negative "looks similar but isn't" cases (`rm -ri`, `git reset --soft`, `git push` plain, `chmod 755`, `rmdir`, etc.). ALL PASS.
+- Aggressive-by-design: `DROP TABLE` flagged even in comments (missed destructive > false positive).
+- Works with zero LLM calls — module imports only `re`/`dataclasses`, confirmed by running tests with Ollama stopped.
+
+
+### Part B — Command interception + contextual explanation (`apps/api/ghosttrace/router.py`)
+- WebSocket endpoint `/ws/ghosttrace?repo_id={id}` — client sends a command, server returns safety classification + Gemma explanation.
+- Safety verdict computed by deterministic engine BEFORE any LLM call — Gemma only explains, never second-guesses (enforced in code structure).
+- Gemma pulls real context from Sprint 1's evidence/history layer (commit hashes, file paths) for grounded explanations.
+- Explicitly opt-in via `GHOSTTRACE_ENABLED` and project-scoped via `GHOSTTRACE_PROJECT_SCOPE_ONLY` — only sees current repo, not the whole machine.
+- Verified with real commands: safe (`ls -la`), caution (`rm old_note.txt`), destructive (`rm -rf ./build`, `git reset --hard HEAD`) — all explanations cite real commit `7fd1a60b`.
+
+
+### Part C — Horror visual identity (`apps/web/app/ghosttrace/`)
+- Distinct terminal-style view, separate feel from clean Repo Séance dashboard.
+- Palette: near-black `#050505` bg, blood-red `#B5121B` accent, Geist_Mono monospace throughout.
+- Custom original ASCII logo (ghost heads + terminal cursor `||█||`), line-by-line startup reveal.
+- CRT scanline + vignette overlay, flickering cursor, rare glitch on state changes (subtle, tested on second viewing).
+- Warning states: DESTRUCTIVE = red animated pulse, CAUTION = amber pulse, SAFE = understated.
+- Ghost-themed notification banner distinct from generic chat bubble.
+- Working terminal: command input, scrollback, readable monospace output, live WebSocket status.
+- Deliberate transition: homepage link "Open GhostTrace terminal" shifts tone without being jarring.
+- `GHOSTTRACE_ENABLED` flag genuinely gates the feature (verified both states).
+
 ## Sprint 1 COMPLETE
 
 All completion criteria met:

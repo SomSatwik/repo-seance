@@ -12,6 +12,184 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* --- GhostTrace horror theme (blood-red accent, near-black) --- */
+@layer base {
+  :root {
+    --gt-bg: #050505;
+    --gt-bg-panel: #0a0a0a;
+    --gt-fg: #e8e8e8;
+    --gt-muted: #8a8a8a;
+    --gt-blood: #B5121B;
+    --gt-blood-dim: #6a0a0e;
+    --gt-caution: #f5a623;
+    --gt-safe: #4ade80;
+  }
+
+  .gt-app {
+    background-color: var(--gt-bg);
+    color: var(--gt-fg);
+    min-height: 100vh;
+  }
+
+  .gt-panel {
+    background-color: var(--gt-bg-panel);
+    border: 1px solid #1a1a1a;
+  }
+
+  .gt-text {
+    color: var(--gt-fg);
+  }
+
+  .gt-muted {
+    color: var(--gt-muted);
+  }
+
+  .gt-blood {
+    color: var(--gt-blood);
+  }
+
+  .gt-blood-dim {
+    color: var(--gt-blood-dim);
+  }
+
+  .gt-caution {
+    color: var(--gt-caution);
+  }
+
+  .gt-safe {
+    color: var(--gt-safe);
+  }
+}
+
+@layer utilities {
+  /* CRT scanline overlay */
+  .gt-scanlines {
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 0, 0, 0) 50%,
+      rgba(181, 18, 27, 0.06) 50%,
+      rgba(181, 18, 27, 0.06)
+    );
+    background-size: 100% 4px;
+    position: relative;
+  }
+
+  .gt-scanlines::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(
+      90deg,
+      rgba(200, 0, 0, 0.06),
+      rgba(181, 18, 27, 0.02)
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Flickering terminal cursor */
+  @keyframes gt-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  .gt-cursor {
+    display: inline-block;
+    width: 0.85em;
+    animation: gt-blink 1.1s steps(1) infinite;
+  }
+
+  /* Rare glitch on state changes */
+  @keyframes gt-glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+  }
+  .gt-glitch {
+    animation: gt-glitch 0.35s cubic-bezier(.25, .46, .45, .94) both;
+  }
+
+  /* Red animated destructive warning */
+  @keyframes gt-pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(181, 18, 27, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(181, 18, 27, 0.1); }
+  }
+  .gt-destructive {
+    border-color: var(--gt-blood) !important;
+    color: var(--gt-blood);
+    animation: gt-pulse-red 2.5s cubic-bezier(.4, 0, .6, 1) infinite;
+    background: rgba(181, 18, 27, 0.08);
+  }
+
+  /* Caution amber underline pulse */
+  @keyframes gt-pulse-amber {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .gt-caution {
+    border-color: var(--gt-caution);
+    color: var(--gt-caution);
+    animation: gt-pulse-amber 3s cubic-bezier(.4, 0, .6, 1) infinite;
+  }
+
+  /* Ghost-themed notification slide */
+  @keyframes gt-slide-in {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 0.95; }
+  }
+  @keyframes gt-slide-out {
+    from { transform: translateY(0); opacity: 0.95; }
+    to { transform: translateY(100%); opacity: 0; }
+  }
+  .gt-notif {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--gt-bg-panel);
+    border: 1px solid #1a1a1a;
+    border-left: 4px solid var(--gt-blood);
+    color: var(--gt-fg);
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);
+    animation: gt-slide-in 0.4s cubic-bezier(.25, .46, .45, .94) both;
+    z-index: 50;
+    max-width: 340px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .gt-notif.caution { border-left-color: var(--gt-caution); }
+  .gt-notif.safe { border-left-color: var(--gt-safe); }
+
+  .gt-notif-close {
+    float: right;
+    margin-left: 0.5rem;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+
+  /* Startup text reveal */
+  @keyframes gt-type {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+  .gt-reveal {
+    overflow: hidden;
+    border-right: 0.15em solid var(--gt-blood);
+    white-space: pre;
+    animation: gt-type 3.5s steps(40, end) both, gt-blink 0.8s step-end infinite alternate;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
