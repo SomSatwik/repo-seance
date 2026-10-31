@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     max_files: int = 5000
     max_tree_depth: int = 6
 
+    # Ollama (local LLM + embeddings)
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "gemma2:2b"
+    ollama_embed_model: str = "nomic-embed-text"
+
     model_config = SettingsConfigDict(
         env_file=str(REPO_ROOT / ".env"),
         env_file_encoding="utf-8",

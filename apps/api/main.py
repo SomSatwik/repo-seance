@@ -6,6 +6,8 @@ from sqlalchemy import text
 
 from database import engine
 from routers import repos
+from routers import history
+from routers import agent
 
 app = FastAPI(title="Repo Séance API", version="0.2.0")
 
@@ -22,6 +24,8 @@ app.add_middleware(
 )
 
 app.include_router(repos.router)
+app.include_router(history.router)
+app.include_router(agent.router)
 
 
 @app.get("/health")
