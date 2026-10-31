@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import CrtOverlay from "./crt-overlay";
@@ -30,6 +30,19 @@ const getApiUrl = () => {
     }
   }
   return process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+};
+
+const getWsUrl = () => {
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "ws://localhost:8000";
+    }
+    if (window.location.protocol === "https:") {
+      return process.env.NEXT_PUBLIC_WS_URL ?? "wss://mainland-mirrors-widely-advertise.trycloudflare.com";
+    }
+    return `ws://${window.location.host}`;
+  }
+  return process.env.NEXT_PUBLIC_WS_URL ?? "ws://127.0.0.1:8000";
 };
 
 type Level = "SAFE" | "CAUTION" | "DESTRUCTIVE" | "INFO" | "SEANCE";
@@ -89,8 +102,6 @@ export default function Terminal({ repoId }: TerminalProps) {
   }, []);
 
   useEffect(() => {
-    const apiBase = getApiUrl();
-    const wsBase = apiBase.replace(/^http/, "ws");
     const ws = new WebSocket(`${getWsUrl()}/ws/ghosttrace?repo_id=${repoId}`);
     wsRef.current = ws;
 
@@ -102,6 +113,9 @@ export default function Terminal({ repoId }: TerminalProps) {
           "SAFE"
         );
       }
+    };
+    ws.onerror = (err) => {
+      console.warn("WebSocket connection error:", err);
     };
     ws.onclose = () => {
       if (wsRef.current === ws) {
