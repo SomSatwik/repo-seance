@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 gitpython
-tree-sitter
+tree-sitter==0.21.3
 tree-sitter-languages
 sqlalchemy
 psycopg[binary]
@@ -9,3 +9,5 @@ pgvector
 python-dotenv
 sentry-sdk
 pydantic-settings
+alembic
+pytest
