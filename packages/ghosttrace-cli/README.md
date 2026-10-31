@@ -88,3 +88,8 @@ it presents GhostTrace's horror identity in a browser. The CLI is the
 installable product surface: a real command in the user's terminal. Both use
 the exact same backend WebSocket, deterministic safety engine, and grounded
 explanations, with no duplicated safety logic.
+
+The CLI uses ANSI styling for its warning hierarchy and initializes Colorama
+for Windows terminal compatibility. Destructive results get a brief red ASCII
+warning mark; caution and destructive results include one restrained rotating
+aside, while safe results stay understated.

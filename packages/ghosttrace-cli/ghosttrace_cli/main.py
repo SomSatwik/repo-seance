@@ -12,6 +12,8 @@ import asyncio
 import os
 import sys
 
+import colorama
+
 from .client import GhostTraceClient
 from .render import (
     DIM,
@@ -22,6 +24,7 @@ from .render import (
     render_connected,
     render_startup,
     render_verdict,
+    render_flavor,
     render_explanation,
     render_evidence,
 )
@@ -69,12 +72,18 @@ async def _repl(client: GhostTraceClient) -> None:
             print(colorize("  the WebSocket may have closed; restart ghosttrace to reconnect", DIM))
             break
         print(render_verdict(verdict.command, verdict.level, verdict.matched_rules))
+        flavor = render_flavor(verdict.level)
+        if flavor:
+            print(flavor)
         print(render_explanation(verdict.explanation, verdict.level))
         print(render_evidence(verdict.evidence))
         print()
 
 
 def run() -> None:
+    colorama.just_fix_windows_console()
+    colorama.init(autoreset=True)
+
     parser = argparse.ArgumentParser(
         prog="ghosttrace",
         description="GhostTrace terminal companion — deterministic shell safety classifications.",

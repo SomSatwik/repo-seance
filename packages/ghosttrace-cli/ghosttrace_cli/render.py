@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sys
 import time
+from itertools import cycle
 from typing import Optional
 
 # ANSI true-color foreground: \033[38;2;R;G;Bm
@@ -22,6 +23,7 @@ RED = "\033[38;2;181;18;27m"      # #B5121B blood-red (DESTRUCTIVE)
 RED_BOLD = "\033[1m\033[38;2;181;18;27m"
 AMBER = "\033[38;2;245;166;35m"   # #F5A623 amber (CAUTION)
 AMBER_BOLD = "\033[1m\033[38;2;245;166;35m"
+GREEN = "\033[38;2;46;204;113m"   # #2ECC71 green (connected / ready)
 DIM = "\033[2m"
 ITALIC = "\033[3m"
 BOLD = "\033[1m"
@@ -41,6 +43,28 @@ ASCII_LOGO = r"""  ___       ___       ___
   \/_____/   \/_/ \/_____/ \/_/
           ||#||
           #  #"""
+
+DESTRUCTIVE_SPLASH = (
+    "    .-''''-.",
+    "   /  !!    \\",
+    "  |  !!  !!  |",
+    "   \\________/",
+)
+
+_CAUTION_FLAVORS = cycle(
+    (
+        "The repository remembers every turn. Check the target before proceeding.",
+        "A small change can leave a long trace. Verify what this will touch.",
+        "Pause here; the next step may be harder to reverse than it looks.",
+    )
+)
+_DESTRUCTIVE_FLAVORS = cycle(
+    (
+        "This action may leave a mark that cannot be undone. Verify the target.",
+        "The history is watching. Check what will be overwritten or removed.",
+        "Stop and inspect the consequences before crossing this line.",
+    )
+)
 
 
 def supports_color() -> bool:
@@ -97,6 +121,8 @@ def render_verdict(command: str, level: str, matched_rules: list[str]) -> str:
     color, label = level_style(level)
     lines: list[str] = []
     lines.append("")
+    if label == "DESTRUCTIVE":
+        lines.extend(colorize(line, RED) for line in DESTRUCTIVE_SPLASH)
     lines.append(colorize(f"  [{label}]", color))
     lines.append(f"  command: {command}")
     if matched_rules:
@@ -104,6 +130,16 @@ def render_verdict(command: str, level: str, matched_rules: list[str]) -> str:
         lines.append(colorize(f"  rules:   {rules}", DIM))
     lines.append("")
     return "\n".join(lines)
+
+
+def render_flavor(level: str) -> str:
+    """Return one brief, in-character aside for a warning; SAFE stays plain."""
+    level = (level or "").upper()
+    if level == "DESTRUCTIVE":
+        return colorize(f"  {next(_DESTRUCTIVE_FLAVORS)}", RED)
+    if level == "CAUTION":
+        return colorize(f"  {next(_CAUTION_FLAVORS)}", AMBER)
+    return ""
 
 
 def render_explanation(explanation: str, level: str) -> str:
