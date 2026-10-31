@@ -53,6 +53,9 @@ interface Message {
   text: string;
   level?: Level;
   matchedRules?: string[];
+  command?: string;
+  flavor?: string;
+  evidence?: Array<{ source_type: string; source_ref: string }>;
   time: string;
 }
 
@@ -78,12 +81,31 @@ export default function Terminal({ repoId }: TerminalProps) {
   }, [messages, scrollToBottom]);
 
   const addSystemMessage = useCallback(
-    (text: string, level?: Level, extra?: { matchedRules?: string[]; evidence?: unknown[] }) => {
+    (
+      text: string,
+      level?: Level,
+      extra?: {
+        matchedRules?: string[];
+        command?: string;
+        flavor?: string;
+        evidence?: Array<{ source_type: string; source_ref: string }>;
+      }
+    ) => {
       const id = Date.now();
       const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setMessages((prev) => [
         ...prev,
-        { id, sender: "system", text, level, matchedRules: extra?.matchedRules, time: now },
+        {
+          id,
+          sender: "system",
+          text,
+          level,
+          matchedRules: extra?.matchedRules,
+          command: extra?.command,
+          flavor: extra?.flavor,
+          evidence: extra?.evidence,
+          time: now,
+        },
       ]);
       return id;
     },
@@ -126,13 +148,18 @@ export default function Terminal({ repoId }: TerminalProps) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.event === "presence") {
+          addSystemMessage(data.message, "SAFE");
+          return;
+        }
         if (data.error) {
           addSystemMessage(`[error] ${data.error}`, "DESTRUCTIVE");
           return;
         }
-        addUserMessage(data.command);
         addSystemMessage(data.explanation, data.level as Level, {
-          matchedRules: data.matchedRules,
+          command: data.command,
+          matchedRules: data.matched_rules || data.matchedRules,
+          flavor: data.flavor,
           evidence: data.evidence,
         });
         if (data.level === "DESTRUCTIVE") {
@@ -258,6 +285,7 @@ export default function Terminal({ repoId }: TerminalProps) {
       addSystemMessage("[error] WebSocket disconnected", "DESTRUCTIVE");
       return;
     }
+    addUserMessage(cmd);
     wsRef.current.send(JSON.stringify({ command: cmd }));
   };
 
@@ -341,40 +369,124 @@ export default function Terminal({ repoId }: TerminalProps) {
       {/* Scrollback area */}
       <main className="flex-1 overflow-y-auto px-4 py-4 pr-12 scroll-smooth relative">
         <div ref={messagesEndRef} />
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`mb-4 font-mono text-sm leading-relaxed ${levelClass(m.level)}`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className={`text-[10px] uppercase tracking-wider font-bold ${
-                  m.sender === "user"
-                    ? "text-[var(--gt-muted)]"
-                    : m.level === "DESTRUCTIVE"
-                    ? "text-[var(--gt-blood)]"
-                    : m.level === "CAUTION"
-                    ? "text-[var(--gt-caution)]"
-                    : "text-[var(--gt-safe)]"
-                }`}
-              >
-                {m.sender === "user" ? "you" : "séance"}
-              </span>
-              {m.level && (
-                <span className="text-[10px] font-bold uppercase tracking-wider">
-                  {levelLabel(m.level)}
-                </span>
-              )}
-              <span className="text-[10px] text-[var(--gt-muted)] ml-auto">{m.time}</span>
-            </div>
-            <div className="whitespace-pre-wrap text-[var(--gt-fg)]">{m.text}</div>
-            {m.matchedRules && m.matchedRules.length > 0 && (
-              <div className="mt-1 text-[10px] text-[var(--gt-muted)]">
-                rules: {m.matchedRules.join(", ")}
+        {messages.map((m) => {
+          if (m.sender === "user") {
+            return (
+              <div key={m.id} className="mb-3 font-mono text-sm text-[var(--gt-fg)] flex items-center gap-2">
+                <span className="text-[#9ef368] font-bold select-none">&gt;</span>
+                <span className="font-semibold text-zinc-100">{m.text}</span>
               </div>
-            )}
-          </div>
-        ))}
+            );
+          }
+
+          if (m.command) {
+            return (
+              <div
+                key={m.id}
+                className={`mb-6 font-mono text-xs sm:text-sm leading-relaxed pl-3 border-l-2 ${
+                  m.level === "DESTRUCTIVE"
+                    ? "border-l-red-500 bg-red-950/10"
+                    : m.level === "CAUTION"
+                    ? "border-l-amber-500 bg-amber-950/10"
+                    : "border-l-emerald-500"
+                } p-2 rounded`}
+              >
+                {/* Destructive ghost ASCII art */}
+                {m.level === "DESTRUCTIVE" && (
+                  <pre className="text-red-500 font-bold mb-2 text-xs leading-none select-none">
+{`   _''''_
+  ( !!   )
+  | !! !!|
+   \\    /`}
+                  </pre>
+                )}
+
+                {/* Level badge */}
+                <div className="mb-1 font-bold">
+                  <span
+                    className={
+                      m.level === "DESTRUCTIVE"
+                        ? "text-red-500 font-bold uppercase tracking-wider"
+                        : m.level === "CAUTION"
+                        ? "text-amber-400 font-bold uppercase tracking-wider"
+                        : "text-emerald-400 font-bold uppercase tracking-wider"
+                    }
+                  >
+                    [{m.level}]
+                  </span>
+                </div>
+
+                {/* Command */}
+                <div className="text-zinc-200">
+                  <span className="text-zinc-500">command: </span>
+                  <span className="font-bold text-zinc-100">{m.command}</span>
+                </div>
+
+                {/* Rules */}
+                {m.matchedRules && m.matchedRules.length > 0 && (
+                  <div className="text-zinc-400 text-xs mb-2">
+                    <span className="text-zinc-500">rules:   </span>
+                    <span>{m.matchedRules.join(", ")}</span>
+                  </div>
+                )}
+
+                {/* Flavor text */}
+                {m.flavor && (
+                  <div
+                    className={`my-2 text-xs font-semibold ${
+                      m.level === "DESTRUCTIVE" ? "text-red-400" : "text-amber-400"
+                    }`}
+                  >
+                    {m.flavor}
+                  </div>
+                )}
+
+                {/* Explanation text */}
+                <div className="whitespace-pre-wrap text-zinc-200 my-2 leading-relaxed">
+                  {m.text}
+                </div>
+
+                {/* Context citations */}
+                {m.evidence && m.evidence.length > 0 && (
+                  <div className="mt-2 text-[11px] text-zinc-500 font-mono">
+                    context:{" "}
+                    {m.evidence
+                      .map((e) => `${e.source_type}:${e.source_ref}`)
+                      .join(", ")}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={m.id}
+              className={`mb-4 font-mono text-sm leading-relaxed ${levelClass(m.level)}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className={`text-[10px] uppercase tracking-wider font-bold ${
+                    m.level === "DESTRUCTIVE"
+                      ? "text-[var(--gt-blood)]"
+                      : m.level === "CAUTION"
+                      ? "text-[var(--gt-caution)]"
+                      : "text-[var(--gt-safe)]"
+                  }`}
+                >
+                  séance
+                </span>
+                {m.level && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    {levelLabel(m.level)}
+                  </span>
+                )}
+                <span className="text-[10px] text-[var(--gt-muted)] ml-auto">{m.time}</span>
+              </div>
+              <div className="whitespace-pre-wrap text-[var(--gt-fg)]">{m.text}</div>
+            </div>
+          );
+        })}
         {messages.length === 0 && (
           <div className="text-[var(--gt-muted)] text-[10px] mt-8 text-center font-mono">
             awaiting command… type in the terminal below

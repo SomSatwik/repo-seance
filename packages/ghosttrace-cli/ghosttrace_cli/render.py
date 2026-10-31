@@ -82,10 +82,10 @@ ASCII_LOGO = r"""  ___       ___       ___
           #  #"""
 
 DESTRUCTIVE_SPLASH = (
-    "    .-''''-.",
-    "   /  !!    \\",
-    "  |  !!  !!  |",
-    "   \\________/",
+    "   _''''_",
+    "  ( !!   )",
+    "  | !! !!|",
+    "   \\    /",
 )
 
 _CAUTION_FLAVORS = cycle(
@@ -160,12 +160,11 @@ def render_verdict(command: str, level: str, matched_rules: list[str]) -> str:
     lines.append("")
     if label == "DESTRUCTIVE":
         lines.extend(colorize(line, RED) for line in DESTRUCTIVE_SPLASH)
-    lines.append(colorize(f"  [{label}]", color))
-    lines.append(f"  command: {command}")
+    lines.append(colorize(f"[{label}]", color))
+    lines.append(f"command: {command}")
     if matched_rules:
         rules = ", ".join(matched_rules)
-        lines.append(colorize(f"  rules:   {rules}", DIM))
-    lines.append("")
+        lines.append(colorize(f"rules:   {rules}", DIM))
     return "\n".join(lines)
 
 
@@ -173,15 +172,15 @@ def render_flavor(level: str) -> str:
     """Return one brief, in-character aside for a warning; SAFE stays plain."""
     level = (level or "").upper()
     if level == "DESTRUCTIVE":
-        return colorize(f"  {next(_DESTRUCTIVE_FLAVORS)}", RED)
+        return colorize(f"{next(_DESTRUCTIVE_FLAVORS)}", RED)
     if level == "CAUTION":
-        return colorize(f"  {next(_CAUTION_FLAVORS)}", AMBER)
+        return colorize(f"{next(_CAUTION_FLAVORS)}", AMBER)
     return ""
 
 
 def render_waiting() -> str:
     """Choose an ambient line for an active request."""
-    return colorize(f"  [analyzing] {random.choice(WAITING_MESSAGES)}", DIM)
+    return colorize(f"[analyzing] {random.choice(WAITING_MESSAGES)}", DIM)
 
 
 def render_explanation(explanation: str, level: str) -> str:
@@ -192,12 +191,13 @@ def render_explanation(explanation: str, level: str) -> str:
     for para in explanation.splitlines():
         para = para.strip()
         if not para:
+            out.append("")
             continue
         wrapped = textwrap.fill(
             para,
             width=width,
-            initial_indent="  ",
-            subsequent_indent="  ",
+            initial_indent="",
+            subsequent_indent="",
             break_long_words=False,
             break_on_hyphens=False,
         )
@@ -213,8 +213,8 @@ def render_evidence(evidence: list[dict]) -> str:
         if item.get("source_type") and item.get("source_ref")
     ]
     if not references:
-        return colorize("  context: no repository evidence returned", DIM)
-    return colorize(f"  context: {', '.join(references)}", DIM)
+        return colorize("context: no repository evidence returned", DIM)
+    return colorize(f"context: {', '.join(references)}", DIM)
 
 
 def render_startup(api_url: str, repo_id: str) -> None:

@@ -32,26 +32,26 @@ router = APIRouter(tags=["ghosttrace"])
 
 # --- Explanation prompt (LLM explains the verdict, never second-guesses it) ---
 
-_EXPLANATION_PROMPT_TEMPLATE = """You are GhostTrace, an old, watchful presence in an abandoned codebase. You have seen this repository's history and remember what changed and when. Your voice is eerie but intelligent: restrained, perceptive, never cartoonish or jokey.
+_EXPLANATION_PROMPT_TEMPLATE = """You are GhostTrace, an AI terminal safety companion with deep knowledge of repository history.
 
-The safety verdict is fixed by a deterministic rule engine. Never question, alter, or repeat it. The CLI already displays the command and matched rule above your explanation.
+A developer entered the shell command:
+`{command}`
 
-Command: {command}
-Fixed verdict: {level}
-Matched rule: {matched_rules}
+Deterministic classification: {level}
+Matched safety rules: {matched_rules}
 
-Evidence retrieved from this repository (the only facts you may use):
+Repository Context (recent commits and file history):
 {evidence}
 
-Write at most 2-3 short sentences (maximum 40 words total). Do not restate the command, verdict, classification reasoning, or matched rule. Add only a repository-specific implication supported by the evidence: explain what a referenced file, commit, or observed gap means in plain language. The separate context line displays source references, so do not repeat hashes.
+Explain why this command was classified as {level} and provide clear pre-flight guidance.
+Follow this structure:
+The command `{command}` will [explain what it does]. This action is classified as {level} because [explain why this command and its flags or targets triggered this classification].
+**Why {level}:** [Explain the specific risks, targeting issues, and potential data loss].
+**Before executing:**
+- [Actionable precaution 1]
+- [Actionable precaution 2]
 
-First check whether the evidence directly mentions the command's target. Nearby commits are not proof that a command target is used, obsolete, or safe to remove. If no evidence mentions the target, say so and state the command's literal effect, without speculating about its purpose. Do not imply that a filesystem operation changes Git history unless it targets Git metadata. Every other sentence must be grounded in an explicit fact from the evidence above. Never invent paths, commits, project history, or claims about a file being untouched.
-
-Use the voice sparingly: one quiet archival observation, not a theatrical flourish. When the evidence does not mention the target, use this shape: "The repository's record has no entry for `<target>`; this command would [literal effect], and the record says nothing about its role." For `rm -rf ./build`, the literal effect is deleting `./build` and its contents, not clearing repository history. Do not add generic warnings or disclaimers such as "exercise caution", "double-check before proceeding", or "it is important to ensure". Do not give advice unrelated to the evidence.
-
-Return only the explanation prose, with no heading or bullet list.
-
-Explanation:"""
+Do not output conversational greetings. Return only the explanation prose with markdown formatting."""
 
 
 def _format_evidence(hits) -> str:
@@ -65,13 +65,24 @@ def _format_evidence(hits) -> str:
 
 def _fallback_explanation(command: str, level: str, matched_rules: list[str]) -> str:
     """Deterministic fallback explanation used when Gemma is unavailable."""
-    rules = "; ".join(matched_rules) if matched_rules else "none"
-    return (
-        f"The command '{command}' was classified as {level} by the deterministic "
-        f"safety engine (rules matched: {rules}). "
-        f"{'This is potentially destructive — review carefully before running.' if level == DESTRUCTIVE else ''}"
-        f"{'Exercise caution — this can modify files or history.' if level == CAUTION else ''}"
-    )
+    rules = ", ".join(matched_rules) if matched_rules else "none"
+    if level == DESTRUCTIVE:
+        return (
+            f"The command `{command}` will perform an irreversible or highly sensitive operation. "
+            f"This action is classified as DESTRUCTIVE because it matched rule(s): {rules}.\n\n"
+            f"**Why DESTRUCTIVE:** This command carries high risk of unintended data loss, irreversible deletion, or corruption.\n\n"
+            f"**Before executing:**\n"
+            f"- Double-check if you truly intend to run `{command}` as this action cannot be easily undone.\n"
+            f"- Ensure you have committed your changes or have a backup before running the command."
+        )
+    if level == CAUTION:
+        return (
+            f"The command `{command}` will modify files, dependencies, or git history. "
+            f"This action is classified as CAUTION because it matched rule(s): {rules}.\n\n"
+            f"**Why CAUTION:** The project history highlights the potential for unintended side-effects or loss of uncommitted work.\n\n"
+            f"**Before running this command, always double-check the arguments and target path to ensure safety.**"
+        )
+    return f"The command `{command}` is safe to run in this repository."
 
 
 @router.websocket("/ws/ghosttrace")
@@ -163,10 +174,17 @@ async def ghosttrace_websocket(
                     logger.warning("ghosttrace: Gemma explanation failed: %s", exc)
                     explanation = _fallback_explanation(command, result.level, result.matched_rules)
 
+            flavor = ""
+            if result.level == DESTRUCTIVE:
+                flavor = "This action may leave a mark that cannot be undone. Verify the target."
+            elif result.level == CAUTION:
+                flavor = "The repository remembers every turn. Check the target before proceeding."
+
             response = {
                 "command": command,
                 "level": result.level,
                 "matched_rules": result.matched_rules,
+                "flavor": flavor,
                 "explanation": explanation,
                 "evidence": [
                     {
