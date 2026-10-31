@@ -76,6 +76,7 @@ def test_rd_s_is_destructive(cmd: str) -> None:
         "git reset --hard HEAD",
         "git reset --hard origin/main",
         "git reset --hard abc1234",
+        "git --hard reset",
     ],
 )
 def test_git_reset_hard_is_destructive(cmd: str) -> None:
@@ -95,6 +96,11 @@ def test_git_reset_mixed_is_caution_not_destructive() -> None:
     assert result.level == CAUTION
 
 
+def test_git_reset_flag_prefixed_is_caution_not_safe() -> None:
+    result = classify("git --reset")
+    assert result.level == CAUTION
+
+
 # --- DESTRUCTIVE: git push --force / -f -----------------------------------
 
 
@@ -105,6 +111,7 @@ def test_git_reset_mixed_is_caution_not_destructive() -> None:
         "git push -f",
         "git push origin main --force",
         "git push --force-with-lease",
+        "git --force push origin main",
     ],
 )
 def test_git_push_force_is_destructive(cmd: str) -> None:
@@ -128,6 +135,7 @@ def test_git_push_plain_is_safe() -> None:
         "git clean -fd -x",
         "git clean --force -d -x",
         "git clean -fdx .",
+        "git clean -x -fd",
     ],
 )
 def test_git_clean_fdx_is_destructive(cmd: str) -> None:
