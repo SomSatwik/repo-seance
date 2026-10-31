@@ -26,6 +26,11 @@ Singapore: a public Next.js service, a public FastAPI service, Render Postgres
 with pgvector, and private CPU Ollama. The API's local Git clones and Ollama's
 model cache are mounted on separate persistent disks.
 
+For single-server self-hosting, `infra/docker-compose.coolify.yml` builds the
+Next.js and FastAPI applications alongside Postgres/pgvector and Ollama.
+Coolify routes public domains to the web and API containers; the database and
+model service remain internal to the Compose network.
+
 ## Components
 
 - **apps/web** — Next.js (TypeScript, Tailwind, App Router). User-facing UI.

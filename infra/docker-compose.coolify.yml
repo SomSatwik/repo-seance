@@ -1,0 +1,85 @@
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: reposeance
+      POSTGRES_USER: reposeance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+    volumes:
+      - reposeance_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U reposeance -d reposeance"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  ollama:
+    build:
+      context: ./ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /var/lib/ollama
+      OLLAMA_MODEL: gemma2:2b
+      OLLAMA_EMBED_MODEL: nomic-embed-text
+    volumes:
+      - ollama_models:/var/lib/ollama
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - ollama list | grep -Fq "$${OLLAMA_MODEL}" && ollama list | grep -Fq "$${OLLAMA_EMBED_MODEL}"
+      interval: 15s
+      timeout: 10s
+      retries: 120
+      start_period: 30s
+
+  api:
+    build:
+      context: ../apps/api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://reposeance:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}@db:5432/reposeance
+      DATA_DIR: /var/data
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: gemma2:2b
+      OLLAMA_EMBED_MODEL: nomic-embed-text
+      GHOSTTRACE_ENABLED: "true"
+      GHOSTTRACE_PROJECT_SCOPE_ONLY: "true"
+      CORS_ORIGINS: ${WEB_ORIGIN:-http://localhost:3000}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - reposeance_repositories:/var/data
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - from urllib.request import urlopen; urlopen("http://127.0.0.1:8000/health", timeout=3)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: ../apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL:-http://localhost:8000}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL:-http://localhost:8000}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  reposeance_pgdata:
+  ollama_models:
+  reposeance_repositories:

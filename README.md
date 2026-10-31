@@ -138,6 +138,19 @@ The API is public and the current app has no user authentication or
 rate-limiting; use this deployment for a demo, not for untrusted production
 traffic. Public repository cloning also requires outbound internet access.
 
+## Self-hosting with Coolify
+
+For a single-VPS deployment, use
+[`infra/docker-compose.coolify.yml`](infra/docker-compose.coolify.yml) with
+Coolify's Docker Compose build pack. It builds the web and API containers,
+runs Postgres with pgvector and private Ollama, and persists the database,
+model weights, and ingested repositories in named volumes.
+
+See [`docs/deploy-coolify.md`](docs/deploy-coolify.md) for VPS setup, Coolify
+configuration, required environment variables, and domain routing. Ollama
+inference runs on CPU unless the VPS is configured for GPU access; allow time
+and disk space for the first model downloads.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in the values. `.env` is git-ignored and
