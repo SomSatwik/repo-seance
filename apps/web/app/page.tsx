@@ -31,14 +31,22 @@ export default function Home() {
   const [targetUrl, setTargetUrl] = useState("");
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
   const [ingestRepoId, setIngestRepoId] = useState<number | null>(null);
+  const [resolvedApi, setResolvedApi] = useState(API_URL);
 
   useEffect(() => {
-    fetch(`${API_URL}/health`)
+    const base =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+        ? "http://127.0.0.1:8000"
+        : process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+    setResolvedApi(base);
+
+    fetch(`${base}/health`)
       .then((res) => res.json())
       .then((data) => setHealth(data as HealthResponse))
       .catch(() => setHealth({ status: "severed", db: "unreachable" }));
 
-    fetch(`${API_URL}/system/status`)
+    fetch(`${base}/system/status`)
       .then((res) => res.json())
       .then((data) => setSystem(data as SystemStatus))
       .catch(() =>
@@ -50,13 +58,17 @@ export default function Home() {
       );
   }, []);
 
+  const isLive =
+    health?.db === "connected" &&
+    (health?.status === "haunted" || health?.status === "ok");
+
   const handleIngest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUrl.trim()) return;
 
     setIngestStatus("Summoning repository spirit...");
     try {
-      const res = await fetch(`${API_URL}/repos/ingest`, {
+      const res = await fetch(`${resolvedApi}/repos/ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: targetUrl.trim() }),
@@ -69,7 +81,7 @@ export default function Home() {
       // Poll status
       const interval = setInterval(async () => {
         try {
-          const pollRes = await fetch(`${API_URL}/repos/${id}/status`);
+          const pollRes = await fetch(`${resolvedApi}/repos/${id}/status`);
           const pollData = await pollRes.json();
           if (pollData.status === "completed") {
             clearInterval(interval);
@@ -109,13 +121,13 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <span
             className={`inline-block h-2 w-2 rounded-full ${
-              health?.db === "connected"
+              isLive
                 ? "bg-[var(--gt-safe)] shadow-[0_0_8px_var(--gt-safe)]"
                 : "bg-[var(--gt-blood)] shadow-[0_0_8px_var(--gt-blood)]"
             }`}
           />
           <span className="text-[10px] uppercase tracking-wider text-zinc-400">
-            {health?.status === "haunted" ? "SPIRIT LINK ACTIVE" : "REALM UNREACHABLE"}
+            {isLive ? "SPIRIT LINK ACTIVE" : "REALM UNREACHABLE"}
           </span>
         </div>
       </header>

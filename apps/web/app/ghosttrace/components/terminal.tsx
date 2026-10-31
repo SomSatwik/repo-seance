@@ -23,9 +23,14 @@ const ASCII_ART = `  ___       ___       ___
          ||█||
          █  █`;
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
-const WS_URL = API_URL.replace(/^http/, "ws");
+const getApiUrl = () => {
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:8000";
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+};
 
 type Level = "SAFE" | "CAUTION" | "DESTRUCTIVE" | "INFO" | "SEANCE";
 
@@ -83,7 +88,9 @@ export default function Terminal({ repoId }: TerminalProps) {
   }, []);
 
   useEffect(() => {
-    const ws = new WebSocket(`${WS_URL}/ws/ghosttrace?repo_id=${repoId}`);
+    const apiBase = getApiUrl();
+    const wsBase = apiBase.replace(/^http/, "ws");
+    const ws = new WebSocket(`${wsBase}/ws/ghosttrace?repo_id=${repoId}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -134,6 +141,7 @@ export default function Terminal({ repoId }: TerminalProps) {
     const cmd = input.trim();
     if (!cmd) return;
     setInput("");
+    const apiBase = getApiUrl();
 
     // --- Help command ---
     if (cmd.toLowerCase() === "help") {
@@ -165,7 +173,7 @@ export default function Terminal({ repoId }: TerminalProps) {
       }
       const waitingId = addSystemMessage("Interrogating repository ghosts...", "SEANCE");
       try {
-        const res = await fetch(`${API_URL}/repos/${repoId}/ask`, {
+        const res = await fetch(`${apiBase}/repos/${repoId}/ask`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question }),
@@ -186,7 +194,7 @@ export default function Terminal({ repoId }: TerminalProps) {
     if (cmd.toLowerCase() === "history" || cmd.toLowerCase() === "contributors") {
       addUserMessage(cmd);
       try {
-        const res = await fetch(`${API_URL}/repos/${repoId}/history`);
+        const res = await fetch(`${apiBase}/repos/${repoId}/history`);
         const data = await res.json();
         const topContribs = data.contributors?.slice(0, 5).map((c: { author: string; commit_count: number }) => `  - ${c.author}: ${c.commit_count} commits`).join("\n") || "  None";
         const recentCommits = data.log?.slice(0, 5).map((c: { short_hash: string; message: string; author: string }) => `  [${c.short_hash}] ${c.message?.split('\n')[0]} (${c.author})`).join("\n") || "  None";
@@ -202,7 +210,7 @@ export default function Terminal({ repoId }: TerminalProps) {
     if (cmd.toLowerCase() === "gap" || cmd.toLowerCase() === "dormancy") {
       addUserMessage(cmd);
       try {
-        const res = await fetch(`${API_URL}/repos/${repoId}/history`);
+        const res = await fetch(`${apiBase}/repos/${repoId}/history`);
         const data = await res.json();
         addSystemMessage(data.gap?.message || "No activity gap detected.", "INFO");
       } catch (err) {
@@ -216,7 +224,7 @@ export default function Terminal({ repoId }: TerminalProps) {
       addUserMessage(cmd);
       const waitingId = addSystemMessage("Synthesizing project recovery roadmap...", "INFO");
       try {
-        const res = await fetch(`${API_URL}/repos/${repoId}/roadmap`, {
+        const res = await fetch(`${apiBase}/repos/${repoId}/roadmap`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
